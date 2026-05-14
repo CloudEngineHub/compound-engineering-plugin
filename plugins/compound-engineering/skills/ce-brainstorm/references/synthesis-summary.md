@@ -8,7 +8,7 @@
 
 This content is loaded when Phase 2.5 fires — after Phase 2 (approaches chosen) and before Phase 3 (write requirements doc). The synthesis is the user's last opportunity to correct the agent's interpretation before the doc lands. It serves two purposes: synthesis confirmation (the user agreed to many individual things in dialogue but never saw the whole) and a transition checkpoint ("about to write a doc").
 
-Fires for **all tiers** including Lightweight. Skip Phase 2.5 entirely on the Phase 0.1b non-software (universal-brainstorming) route. In non-interactive (headless) mode, Phase 2.5 still fires — the internal draft is composed but stage 2 is skipped (no synchronous user); Inferred bets route to a `## Assumptions` section in the doc. See "Headless mode" below for the full routing.
+Fires for **all tiers** including Lightweight. Skip Phase 2.5 entirely on the Phase 0.1b non-software (universal-brainstorming) route. In non-interactive (headless) mode, Phase 2.5 still fires — the internal draft and the "What we're building" prose are still composed, but the chat-time rendering of stage 2 is skipped (no synchronous user); Inferred bets route to a `## Assumptions` section in the doc. See "Headless mode" below for the full routing.
 
 ---
 
@@ -33,14 +33,14 @@ The scoping synthesis has up to four named sections, each **render-conditional**
 1. **What we're building** (always present) — 1–3 sentences. The shape that emerged from dialogue, forward-looking, plain words. Not a transcript of "you said X."
 2. **Key trade-offs** (conditional) — 1–3 bullets, each with a brief why. Render only when real trade-offs were made in dialogue.
 3. **What's not in scope** (conditional) — 1–3 bullets, or fold into a single sentence. Render only when deferred items would surprise a downstream reader if absent.
-4. **Call outs** (conditional) — 0–3 bullets. Genuine forks the user should weigh in on.
+4. **Call outs** (conditional) — 0–3 bullets. Residual forks the dialogue didn't resolve: post-dialogue consequences (combining user answers surfaced something they couldn't see during Q&A), silent agent inferences, or — in pre-loaded contexts with no dialogue — scope bets the user is seeing for the first time. **Not "questions the agent could have asked during Phase 1.3 but didn't"** — if a call-out reads like a missed dialogue question, Phase 1.3's integration check failed; flag the gap rather than padding the section.
 
 Each section answers a different question:
 
 - **What's being built?** → shape
 - **What did we trade off?** → explicit choices made in conversation
 - **What did we cut?** → deferred items a reader would expect to see acknowledged
-- **Where might you redirect?** → genuine forks the user can correct now
+- **Where might you redirect?** → residual forks: post-dialogue consequences, silent inferences, late-cycle bets
 
 Then the confirmation: *"Confirm and I'll write the requirements doc next, drawing on our dialogue and this synthesis. Or tell me what to change."* The phrasing sets the expectation that confirm → doc-write, so the user knows what's about to happen and can interrupt without ambiguity.
 
@@ -244,11 +244,11 @@ Fall back to a numbered list in chat only when no blocking tool exists or the ca
 
 When the skill is invoked from an automated workflow such as LFG or any `disable-model-invocation` context, the skill runs in non-interactive mode (no synchronous user). This does NOT mean unaudited — the artifact is read by downstream skills (ce-doc-review, ce-plan) and human reviewers (PR review). Audit shifts from chat history to the artifact itself.
 
-**Stage 2 is moot in headless mode.** Compose the internal draft (stage 1) as usual, but skip the chat-time scoping synthesis entirely — there is no synchronous user to confirm to, no scoping synthesis sections to derive, no Path A / Path B gate. Route the internal draft directly into the doc body via the doc-shape table below.
+**Only the chat-time presentation of stage 2 is moot in headless mode.** Compose the internal draft (stage 1) as usual, then compose the **"What we're building" prose** the same way you would for an interactive run — it provides the doc's `## Summary` content, which is required for Standard/Deep docs and most Lightweight docs per `references/requirements-capture.md`. What is skipped is the *chat-time rendering* of stage 2: the conditional Trade-offs / What's-not-in-scope / Call-outs sections, the confirmation question, and the Path A / Path B gate. There is no synchronous user, so there is nothing to present and nothing to gate on.
 
 Shared behavior:
 
-- **No user prompt; no blocking question; no scoping synthesis emission.**
+- **No user prompt; no blocking question; no chat-time scoping synthesis emission.** The "What we're building" prose is still composed; it is not emitted to chat, it is routed straight into `## Summary` when Phase 3 writes the doc.
 - **Route internal-draft content into the doc with mode-aware shape:**
   - **Stated** content → Requirements (user's actual stated constraints)
   - **Out-of-scope** content → Scope Boundaries (deliberate exclusions)
