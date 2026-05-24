@@ -181,8 +181,13 @@ brainstorm frontmatter). Common rules:
   and below.
 - Field names in lowercase snake_case (`status`, `created_at`, not
   `Status`, `CreatedAt`).
-- `status` is editable — downstream skills flip it (`active → completed`)
-  via direct YAML edit at shipping time.
+- **Status lifecycle is per-contract.** When the section contract
+  defines a `status` field with a lifecycle (plans use
+  `active → completed`, flipped by ce-work at shipping time via direct
+  YAML edit), it is editable in place. When the section contract does
+  not define a status lifecycle (brainstorms, for example, have no
+  `active → completed` flip — they are upstream of plans and
+  referenced via the plan's `origin:`), do not introduce one.
 - Stable across artifact revisions — never rename or repurpose a field.
 
 ## Post-write audit
