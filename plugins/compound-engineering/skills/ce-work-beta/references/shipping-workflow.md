@@ -34,7 +34,7 @@ This file contains the shipping workflow (Phase 3-4). Load it only when all Phas
 
    **2a. Review (read-only).** Invoke `ce-code-review` with `mode:agent` (and `plan:<path>` when known; add `base:<ref>` when the diff base is already resolved). Parse JSON or Actionable Findings. Do not pass `mode:autofix`.
 
-   **2b. Apply fixes (caller-owned).** Load `ce-work` `references/review-findings-followup.md`: filter on JSON, batch by file, dispatch fix subagents. Then proceed to the Residual Work Gate.
+   **2b. Apply fixes (caller-owned).** Load `references/review-findings-followup.md`: filter on JSON, batch by file, dispatch fix subagents. Then proceed to the Residual Work Gate.
 
    **When Tier 1 is unavailable and Tier 2 criteria are not met:** skip a dedicated review step. Phase 2 testing, simplify (when run), lint, and Final Validation still apply. Note in the shipping summary: `Code review: skipped (no Tier 1 tool; Tier 2 criteria not met).`
 
@@ -56,7 +56,7 @@ This file contains the shipping workflow (Phase 3-4). Load it only when all Phas
    Stem: `Code review found N residual finding(s) the skill did not auto-fix. How should the agent proceed?`
 
    Options (four or fewer, self-contained labels):
-   - `Apply/fix now` — load `ce-work` `references/review-findings-followup.md`, dispatch batched fix subagents for remaining eligible findings, run tests, commit if needed.
+   - `Apply/fix now` — load `references/review-findings-followup.md`, dispatch batched fix subagents for remaining eligible findings, run tests, commit if needed.
    - `File tickets via project tracker` — load `references/tracker-defer.md` in Interactive mode; the agent files tickets in the project's detected tracker (or `gh` fallback, or leaves them in the report if no sink exists) and proceeds to Final Validation.
    - `Accept and proceed` — record the residual findings verbatim in a durable "Known Residuals" sink before shipping. If a PR will be created or updated in Phase 4, include them in the PR description's "Known Residuals" section (the agent owns this when calling `ce-commit-push-pr`). If the user later chooses the no-PR `ce-commit` path, create `docs/residual-review-findings/<branch-or-head-sha>.md`, include the accepted findings and source review-run context, stage it with the implementation commit, and mention the file path in the final summary. The user has acknowledged the risk, but the findings must not live only in the transient session.
    - `Stop — do not ship` — abort the shipping workflow. The user will handle findings manually before re-invoking.
@@ -142,7 +142,7 @@ Before creating PR, verify:
 
 **Tier 1 -- harness-native review.** Built-in command or skill (e.g., `/review`). Fix findings inline.
 
-**Tier 2 -- `ce-code-review` (escalation).** (2a) Review-only via `mode:agent`. (2b) Batched fix subagents per `ce-work` `references/review-findings-followup.md`; residuals → Residual Work Gate.
+**Tier 2 -- `ce-code-review` (escalation).** (2a) Review-only via `mode:agent`. (2b) Batched fix subagents per `references/review-findings-followup.md`; residuals → Residual Work Gate.
 
 **Skip dedicated review** when no Tier 1 and Tier 2 criteria not met (document in summary).
 

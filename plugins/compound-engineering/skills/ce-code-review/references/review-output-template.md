@@ -129,14 +129,15 @@ This fails because: no pipe-delimited tables, no severity-grouped `###` headers,
 - **Horizontal rule** (`---`) separates findings from verdict
 - **`###` headers** for each section -- never plain text headers
 
-## Headless Mode Format
+## Agent mode (JSON)
 
-In agent mode (`mode:agent`), replace the interactive pipe-delimited table report with a structured text envelope. The agent format is defined in the `### Agent output format` section of SKILL.md. Key differences from the interactive format:
+When `mode:agent` is active, **do not** emit the markdown table report above. Emit **one parseable JSON object** as the primary response and write the same payload to `review.json` under `/tmp/compound-engineering/ce-code-review/<run-id>/`.
 
-- **No pipe-delimited tables.** Findings use `[severity][autofix_class -> owner] File: <file:line> -- <title>` line format with indented Why/Evidence/Suggested fix lines.
-- **Findings grouped by autofix_class** (gated-auto, manual, advisory) instead of severity. Within each group, findings are sorted by severity.
-- **Verdict in header** (top of output) instead of bottom, so programmatic callers get it first.
-- **`Artifact:` line** in metadata header gives callers the path to the full run artifact.
-- **`[needs-verification]` marker** on findings where `requires_verification: true`.
-- **Evidence lines** included per finding.
-- **Completion signal:** "Review complete" as the final line.
+The contract is defined in SKILL.md under **`### JSON output format (`mode:agent` only)`**. Minimum fields: `status`, `verdict`, `scope`, `intent`, `reviewers`, `findings`, `actionable_findings`, `artifact_path`, `run_id`.
+
+Key differences from the interactive markdown format:
+
+- **No pipe-delimited tables** — findings are JSON arrays with merged fields (`#`, `title`, `severity`, `file`, `line`, `confidence`, `autofix_class`, `owner`, `suggested_fix`, `why_it_matters`, `evidence`, `reviewers`, etc.).
+- **`actionable_findings`** — subset for caller apply workflows (`gated_auto` / `manual` with `downstream-resolver`).
+- **Failure/degraded paths** — `{"status":"failed","reason":"..."}` or `"status":"degraded"` with reason; never mix markdown tables into the JSON response.
+- **Stable `#`** — same numbering as Stage 5 synthesis, carried in JSON finding objects for downstream apply/residual tracking.
