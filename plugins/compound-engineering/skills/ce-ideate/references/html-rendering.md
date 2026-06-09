@@ -505,10 +505,22 @@ fine when the content suggests them.
 
 ## Agent-consumability rules
 
-Downstream agents that read HTML today (`ce-work`, future consumers) read
-the HTML file as text linearly, not via DOM extraction. `ce-doc-review` is
-not a current HTML consumer (see opening note). Compose so semantic
-understanding is reachable in source:
+Downstream agents that read HTML today (`ce-work`, a skill re-reading its
+own prior artifact on a resume run, future consumers) reason over the HTML
+as text — the way they reason over markdown, not via DOM extraction or a
+script-style parse. `ce-doc-review` is not a current HTML consumer (see
+opening note).
+
+These rules are why such a consumer can locate one item (a single
+requirement, unit, idea, or other ID-bearing entry) and reason over it from
+source alone — its title, every labeled field, and any diagram's meaning —
+with no hidden machine-readable copy to fall back on. The semantic structure
+*is* the extraction contract: it is what makes the single-source-of-truth
+invariant (no `data-*` or JSON metadata mirror) safe rather than lossy.
+Weakening it — `<article>` item boundaries collapsed into `<div>` soup, a
+field label demoted to an attribute, one item's content scattered across
+distant parts of the doc — breaks that reasoning even when the rendered page
+looks identical. Compose so semantic understanding is reachable in source:
 
 - **Use semantic HTML over `<div>` soup.** `<article>` per unit card,
   `<dl>` for metadata pairs, `<table>` for tabular content, `<details>`
