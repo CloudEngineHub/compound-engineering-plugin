@@ -116,9 +116,12 @@ describe("ce-worktree SKILL.md", () => {
       /work in the current (directory|checkout) instead/i.test(SKILL_BODY),
       "ce-worktree/SKILL.md must not instruct the agent to silently work in the current checkout on a sandbox failure — that defeats the isolation contract.",
     ).toBe(false)
+    // The confirmation is blocking, so it must route through the platform's
+    // blocking-question tool (AGENTS.md > Cross-Platform User Interaction),
+    // not a vague "ask the user" that can degrade to a non-blocking prompt.
     expect(
-      SKILL_BODY.includes("ask the user how to proceed"),
-      "ce-worktree/SKILL.md must report the failure and ask the user how to proceed when worktree creation fails, rather than silently continuing in the current checkout.",
+      SKILL_BODY.includes("AskUserQuestion") && SKILL_BODY.includes("request_user_input"),
+      "ce-worktree/SKILL.md must route the sandbox-failure confirmation through the platform's blocking question tool (name AskUserQuestion / request_user_input / ask_user), per AGENTS.md > Cross-Platform User Interaction, rather than a non-blocking 'ask the user'.",
     ).toBe(true)
   })
 })
