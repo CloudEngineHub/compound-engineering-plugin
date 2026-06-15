@@ -103,9 +103,15 @@ import { parseFrontmatter } from "../src/utils/frontmatter"
  *    Skills"): skill markdown using harness variables (${CLAUDE_*},
  *    ${CODEX_*}) must degrade gracefully. Mechanically graceful forms pass
  *    outright: a shell default (`${VAR:-...}`) or an existence guard
- *    (`[ -n "$VAR" ]` / `[ -z "$VAR" ]`). Any other use must be explicitly
- *    acknowledged in PLATFORM_VAR_ACKNOWLEDGED with a written reason naming
- *    the prose fallback (the AGENTS.md pre-resolution pattern). An earlier
+ *    (`[ -n "$VAR" ]` / `[ -z "$VAR" ]` / `[ -f "${VAR}/path" ]`). EXCEPTION:
+ *    a skill-directory var (CLAUDE_SKILL_DIR / CLAUDE_PLUGIN_ROOT, see
+ *    SKILL_DIR_VARS) used to locate a bundled file is NOT made graceful by a
+ *    `${VAR:-.}` default — that default resolves to the project CWD and
+ *    silently misses the bundled script on non-Claude targets (issue #943);
+ *    it must use an existence guard or be acknowledged. Any other use must be
+ *    explicitly acknowledged in PLATFORM_VAR_ACKNOWLEDGED with a written
+ *    reason naming the prose fallback (the AGENTS.md pre-resolution pattern).
+ *    An earlier
  *    revision tried to verify the fallback PROSE itself, via a fallback
  *    keyword list and a line window — that graded English with regexes and
  *    failed legitimate rewordings, so the editorial judgment now lives in
@@ -454,12 +460,23 @@ const GUARD_TEST = `\\[\\s*-[nzefd]\\s+`
 const PLATFORM_VAR_CAPTURE = `\\$\\{?((?:CLAUDE|CODEX)_[A-Z][A-Z0-9_]*)\\b`
 
 /**
+ * Skill-directory variables — used to locate a bundled file. For these, a
+ * `${VAR:-default}` shell default is NOT a graceful fallback: the default
+ * (e.g. `.`) resolves to the project CWD on non-Claude targets and silently
+ * misses the bundled script (issue #943). They must use an existence guard
+ * (so the off-Claude branch is explicit) or carry an acknowledged reason —
+ * a plain `${VAR:-.}` bundled-script path must not pass the convention.
+ */
+const SKILL_DIR_VARS = new Set(["CLAUDE_SKILL_DIR", "CLAUDE_PLUGIN_ROOT"])
+
+/**
  * True when the occurrence on this line is gracefully handled *by the line
- * itself*: a `${VAR:-...}` shell default, or a `[ -n/-z/-f/-e/-d "...$VAR..." ]`
+ * itself*: a `${VAR:-...}` shell default (for ordinary vars only — skill-dir
+ * vars are excluded, see SKILL_DIR_VARS), or a `[ -n/-z/-f/-e/-d "...$VAR..." ]`
  * test (existence/non-empty guard).
  */
 function isGracefulPlatformVarUse(line: string, variable: string): boolean {
-  if (new RegExp(`\\$\\{${variable}:-`).test(line)) return true
+  if (!SKILL_DIR_VARS.has(variable) && new RegExp(`\\$\\{${variable}:-`).test(line)) return true
   return new RegExp(`${GUARD_TEST}"[^"]*\\$\\{?${variable}\\b[^"]*"\\s*\\]`).test(line)
 }
 
@@ -574,7 +591,7 @@ const PLATFORM_VAR_ACKNOWLEDGED = new Map<string, string>([
   ],
   [
     "plugins/compound-engineering/skills/ce-worktree/SKILL.md#CLAUDE_SKILL_DIR",
-    "Prose explaining the variable's cross-harness behavior, not a use — every executable use in the file carries the ${CLAUDE_SKILL_DIR:-.} shell default.",
+    "Known laggard: ce-worktree still invokes its bundled script via the legacy ${CLAUDE_SKILL_DIR:-.} form (the #943 regression pattern that silently misses off-Claude). Acknowledged here pending its re-architecture to a script-free isolation guardrail in #946 (PR #948), which removes the bundled script entirely.",
   ],
 ])
 
@@ -702,7 +719,7 @@ describe("platform-variable fallback (AGENTS.md 'Platform-Specific Variables in 
       }
       expect(
         offenders,
-        `Platform variables (\${CLAUDE_*}, \${CODEX_*}) must not be assumed to resolve — see ${AGENTS_MD_REF} "Platform-Specific Variables in Skills". Prefer relative paths from the skill directory; otherwise use a shell default (\${VAR:-...}) or an existence/non-empty guard inside a code block ([ -f "\${VAR}/path" ] or [ -n "$VAR" ]). If the fallback genuinely lives in prose (the AGENTS.md pre-resolution pattern, or a core-script skill pinned via allowed-tools), write that prose first, then acknowledge the use in PLATFORM_VAR_ACKNOWLEDGED in tests/skill-conventions.test.ts with a reason naming the fallback.\nOffending occurrences:\n${offenders.join("\n")}`,
+        `Platform variables (\${CLAUDE_*}, \${CODEX_*}) must not be assumed to resolve — see ${AGENTS_MD_REF} "Platform-Specific Variables in Skills". An ordinary var may use a shell default (\${VAR:-...}); a skill-directory var (CLAUDE_SKILL_DIR / CLAUDE_PLUGIN_ROOT) used to locate a bundled file must NOT — its default silently misses the script off-Claude (#943) — so guard it with an existence test inside a code block ([ -f "\${VAR}/path" ]). If the fallback genuinely lives in prose (the AGENTS.md pre-resolution pattern, or a core-script skill pinned via allowed-tools), write that prose first, then acknowledge the use in PLATFORM_VAR_ACKNOWLEDGED in tests/skill-conventions.test.ts with a reason naming the fallback.\nOffending occurrences:\n${offenders.join("\n")}`,
       ).toEqual([])
     })
   }
@@ -1051,9 +1068,16 @@ describe("findPlatformVarOccurrences / isGracefulPlatformVarUse", () => {
     ])
   })
 
-  test("treats ${VAR:-default} as graceful", () => {
+  test("treats ${VAR:-default} as graceful for ordinary platform vars", () => {
+    const occurrences = findPlatformVarOccurrences('echo "${CODEX_SANDBOX:-0}"')
+    expect(occurrences).toEqual([{ lineNumber: 1, variable: "CODEX_SANDBOX", graceful: true }])
+  })
+
+  test("does NOT treat ${CLAUDE_SKILL_DIR:-.} as graceful (issue #943 regression)", () => {
+    // A skill-dir var with a `:-` shell default silently misses the bundled
+    // script off-Claude — it must use an existence guard, not `:-`.
     const occurrences = findPlatformVarOccurrences('bash "${CLAUDE_SKILL_DIR:-.}/scripts/x.sh"')
-    expect(occurrences).toEqual([{ lineNumber: 1, variable: "CLAUDE_SKILL_DIR", graceful: true }])
+    expect(occurrences).toEqual([{ lineNumber: 1, variable: "CLAUDE_SKILL_DIR", graceful: false }])
   })
 
   test("treats [ -n \"$VAR\" ] existence guards as graceful", () => {
@@ -1095,7 +1119,13 @@ describe("findPlatformVarViolations", () => {
   })
 
   test("graceful uses are not reported", () => {
-    expect(findPlatformVarViolations('bash "${CLAUDE_SKILL_DIR:-.}/scripts/x.sh"')).toEqual([])
+    expect(findPlatformVarViolations('echo "${CODEX_SANDBOX:-0}"')).toEqual([])
+  })
+
+  test("a ${CLAUDE_SKILL_DIR:-.} bundled-script path IS reported (issue #943)", () => {
+    expect(
+      findPlatformVarViolations('bash "${CLAUDE_SKILL_DIR:-.}/scripts/x.sh"').map((v) => v.variable),
+    ).toEqual(["CLAUDE_SKILL_DIR"])
   })
 
   test("an existence-guarded bundled-script block reports no violations (issue #943)", () => {
