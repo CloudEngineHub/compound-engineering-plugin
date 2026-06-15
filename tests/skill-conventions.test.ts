@@ -447,29 +447,107 @@ const PLATFORM_VAR_REGEX = /\$\{?((?:CLAUDE|CODEX)_[A-Z][A-Z0-9_]*)/g
 
 type PlatformVarOccurrence = { lineNumber: number; variable: string; graceful: boolean }
 
-/** True when the occurrence on this line uses `${VAR:-...}` or sits in `[ -n/-z "$VAR..." ]`. */
+// Shell test operators that count as guarding a platform variable: `-n`/`-z`
+// (set / unset) and `-f`/`-e`/`-d` (path existence). Defined once so the three
+// guard matchers below stay in lockstep when the set changes.
+const GUARD_TEST = `\\[\\s*-[nzefd]\\s+`
+const PLATFORM_VAR_CAPTURE = `\\$\\{?((?:CLAUDE|CODEX)_[A-Z][A-Z0-9_]*)\\b`
+
+/**
+ * True when the occurrence on this line is gracefully handled *by the line
+ * itself*: a `${VAR:-...}` shell default, or a `[ -n/-z/-f/-e/-d "...$VAR..." ]`
+ * test (existence/non-empty guard).
+ */
 function isGracefulPlatformVarUse(line: string, variable: string): boolean {
-  const defaultForm = new RegExp(`\\$\\{${variable}:-`)
-  if (defaultForm.test(line)) return true
-  const guardForm = new RegExp(`\\[\\s*-[nz]\\s+"[^"]*\\$\\{?${variable}\\b[^"]*"\\s*\\]`)
-  return guardForm.test(line)
+  if (new RegExp(`\\$\\{${variable}:-`).test(line)) return true
+  return new RegExp(`${GUARD_TEST}"[^"]*\\$\\{?${variable}\\b[^"]*"\\s*\\]`).test(line)
 }
 
+/** Platform variables the markdown guards with a `[ -n/-z/-f/-e/-d "...$VAR..." ]` test anywhere. */
+function fileGuardedVars(markdown: string): Set<string> {
+  const guarded = new Set<string>()
+  const guardForm = new RegExp(`${GUARD_TEST}"[^"]*${PLATFORM_VAR_CAPTURE}[^"]*"\\s*\\]`, "g")
+  let match: RegExpExecArray | null
+  while ((match = guardForm.exec(markdown)) !== null) guarded.add(match[1])
+  return guarded
+}
+
+/** Matches the opening of a guard block, e.g. `if [ -f "${CLAUDE_SKILL_DIR}/scripts/x" ]; then`. */
+const GUARD_BLOCK_OPEN = new RegExp(`\\bif\\b.*${GUARD_TEST}"[^"]*${PLATFORM_VAR_CAPTURE}`, "g")
+
+/** Collects every platform variable a line opens an `if [ -X "$VAR..." ]` guard for. */
+function guardsOpenedOnLine(line: string): Set<string> {
+  const opened = new Set<string>()
+  let match: RegExpExecArray | null
+  GUARD_BLOCK_OPEN.lastIndex = 0
+  while ((match = GUARD_BLOCK_OPEN.exec(line)) !== null) opened.add(match[1])
+  return opened
+}
+
+/**
+ * Gracefulness is context-sensitive (issue #943). Fence parsing reuses
+ * `partitionFencedCodeBlocks` so it follows the same markdown model as the
+ * rest of this file (4-backtick outer fences, `~~~`, etc.):
+ *
+ * - Inside a fenced code block (an *executable* context), a use is graceful
+ *   only if the line itself guards the variable, or the line sits inside an
+ *   open `if [ -f "${VAR}/..." ]; then ... fi` guard block. Block-scoped on
+ *   purpose: a second, *unguarded* script invocation in the same file is still
+ *   reported, not masked by an unrelated guard. A self-contained single-line
+ *   guard (`if ...; then bash X; fi`) covers only its own line — the `fi`
+ *   closes the block so later lines are not treated as guarded.
+ * - Outside code fences (a *prose* mention, e.g. "resolves via `${VAR}`"), a
+ *   use is graceful if the line itself is graceful or the file guards the
+ *   variable somewhere — so explanatory prose in a skill that does guard the
+ *   variable does not generate noise.
+ */
 function findPlatformVarOccurrences(markdown: string): PlatformVarOccurrence[] {
   const out: PlatformVarOccurrence[] = []
-  const lines = markdown.split("\n")
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+  const { prose, fencedLines } = partitionFencedCodeBlocks(markdown)
+  const fileGuarded = fileGuardedVars(markdown)
+
+  // Prose occurrences (fenced lines are blanked in `prose`).
+  const proseLines = prose.split("\n")
+  for (let i = 0; i < proseLines.length; i++) {
+    const line = proseLines[i]
+    if (!line) continue
     let match: RegExpExecArray | null
     PLATFORM_VAR_REGEX.lastIndex = 0
     while ((match = PLATFORM_VAR_REGEX.exec(line)) !== null) {
+      const variable = match[1]
       out.push({
         lineNumber: i + 1,
-        variable: match[1],
-        graceful: isGracefulPlatformVarUse(line, match[1]),
+        variable,
+        graceful: isGracefulPlatformVarUse(line, variable) || fileGuarded.has(variable),
       })
     }
   }
+
+  // Fenced (executable) occurrences, with block-scoped guard tracking.
+  let activeGuard = new Set<string>()
+  let prevLineNumber = -2
+  for (const { lineNumber, value: line } of fencedLines) {
+    if (lineNumber !== prevLineNumber + 1) activeGuard = new Set() // new fenced block
+    prevLineNumber = lineNumber
+    const openedHere = guardsOpenedOnLine(line)
+    const lineGuard = new Set([...activeGuard, ...openedHere])
+    let match: RegExpExecArray | null
+    PLATFORM_VAR_REGEX.lastIndex = 0
+    while ((match = PLATFORM_VAR_REGEX.exec(line)) !== null) {
+      const variable = match[1]
+      out.push({
+        lineNumber,
+        variable,
+        graceful: isGracefulPlatformVarUse(line, variable) || lineGuard.has(variable),
+      })
+    }
+    // A `fi` on this line closes the block (covers single-line guards); otherwise
+    // any guard opened here stays active for subsequent lines in this block.
+    if (/\bfi\b/.test(line)) activeGuard = new Set()
+    else for (const variable of openedHere) activeGuard.add(variable)
+  }
+
+  out.sort((a, b) => a.lineNumber - b.lineNumber)
   return out
 }
 
@@ -624,7 +702,7 @@ describe("platform-variable fallback (AGENTS.md 'Platform-Specific Variables in 
       }
       expect(
         offenders,
-        `Platform variables (\${CLAUDE_*}, \${CODEX_*}) must not be assumed to resolve — see ${AGENTS_MD_REF} "Platform-Specific Variables in Skills". Prefer relative paths from the skill directory; otherwise use a shell default (\${VAR:-...}) or an existence guard ([ -n "$VAR" ]). If the fallback genuinely lives in prose (the AGENTS.md pre-resolution pattern), write that prose first, then acknowledge the use in PLATFORM_VAR_ACKNOWLEDGED in tests/skill-conventions.test.ts with a reason naming the fallback.\nOffending occurrences:\n${offenders.join("\n")}`,
+        `Platform variables (\${CLAUDE_*}, \${CODEX_*}) must not be assumed to resolve — see ${AGENTS_MD_REF} "Platform-Specific Variables in Skills". Prefer relative paths from the skill directory; otherwise use a shell default (\${VAR:-...}) or an existence/non-empty guard inside a code block ([ -f "\${VAR}/path" ] or [ -n "$VAR" ]). If the fallback genuinely lives in prose (the AGENTS.md pre-resolution pattern, or a core-script skill pinned via allowed-tools), write that prose first, then acknowledge the use in PLATFORM_VAR_ACKNOWLEDGED in tests/skill-conventions.test.ts with a reason naming the fallback.\nOffending occurrences:\n${offenders.join("\n")}`,
       ).toEqual([])
     })
   }
@@ -1018,6 +1096,71 @@ describe("findPlatformVarViolations", () => {
 
   test("graceful uses are not reported", () => {
     expect(findPlatformVarViolations('bash "${CLAUDE_SKILL_DIR:-.}/scripts/x.sh"')).toEqual([])
+  })
+
+  test("an existence-guarded bundled-script block reports no violations (issue #943)", () => {
+    // The guard line opens the block; the guarded call on the next line is
+    // graceful because it sits inside the open `if [ -f ... ]; then ... fi`.
+    const sample = [
+      '```bash',
+      'if [ -f "${CLAUDE_SKILL_DIR}/scripts/x.sh" ]; then',
+      '  bash "${CLAUDE_SKILL_DIR}/scripts/x.sh" create feat/login',
+      'else',
+      '  echo "unavailable on this platform"',
+      'fi',
+      '```',
+    ].join("\n")
+    expect(findPlatformVarViolations(sample)).toEqual([])
+  })
+
+  test("a guarded script does NOT mask a second unguarded script of the same var (block-scoped)", () => {
+    // x.py is guarded; y.py — after `fi`, outside any guard — must still be
+    // reported, or the convention would miss issue #943's bug for y.py.
+    const sample = [
+      '```bash',
+      'if [ -f "${CLAUDE_SKILL_DIR}/scripts/x.py" ]; then',
+      '  python3 "${CLAUDE_SKILL_DIR}/scripts/x.py"',
+      'fi',
+      'python3 "${CLAUDE_SKILL_DIR}/scripts/y.py"',
+      '```',
+    ].join("\n")
+    const violations = findPlatformVarViolations(sample)
+    expect(violations.map((v) => v.lineNumber)).toEqual([5])
+  })
+
+  test("a single-line guard does not leak gracefulness to later lines in the same fence", () => {
+    // The guard and call are one line; the `fi` closes the block, so the
+    // following unguarded y.py must still be reported (regression: an earlier
+    // version cleared the guard only on a line that was exactly `fi`).
+    const sample = [
+      '```bash',
+      'if [ -f "${CLAUDE_SKILL_DIR}/scripts/x.py" ]; then python3 "${CLAUDE_SKILL_DIR}/scripts/x.py"; fi',
+      'python3 "${CLAUDE_SKILL_DIR}/scripts/y.py"',
+      '```',
+    ].join("\n")
+    expect(findPlatformVarViolations(sample).map((v) => v.lineNumber)).toEqual([3])
+  })
+
+  test("prose mentions of a guarded var are not reported (no acknowledgment noise)", () => {
+    // The executable use is guarded in a fence; the later prose sentence
+    // mentioning the same var must not be flagged.
+    const sample = [
+      '```bash',
+      'if [ -f "${CLAUDE_SKILL_DIR}/scripts/x.sh" ]; then bash "${CLAUDE_SKILL_DIR}/scripts/x.sh"; fi',
+      '```',
+      '',
+      'On Claude Code `${CLAUDE_SKILL_DIR}` resolves to the skill directory.',
+    ].join("\n")
+    expect(findPlatformVarViolations(sample)).toEqual([])
+  })
+
+  test("a bare ${VAR} use with no existence guard anywhere is still reported", () => {
+    const sample = [
+      '```bash',
+      'python3 "${CLAUDE_SKILL_DIR}/scripts/x.py" out.md',
+      '```',
+    ].join("\n")
+    expect(findPlatformVarViolations(sample).map((v) => v.variable)).toEqual(["CLAUDE_SKILL_DIR"])
   })
 })
 
