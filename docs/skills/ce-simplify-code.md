@@ -16,7 +16,7 @@ The compound-engineering ideation chain is `/ce-ideate → /ce-brainstorm → /c
 |----------|--------|
 | What does it do? | Spawns three parallel reviewer agents on the recently-changed code, applies their findings, and verifies behavior is preserved |
 | When to use it | Before opening a PR; after writing a feature; after AI generated code that works but feels heavy |
-| What it produces | Updated code (in place) + a summary of what was changed, what was good as-is, and which checks ran |
+| What it produces | Updated code (in place) + a summary of what was changed, what was good as-is, which checks ran, and a quantified impact by dimension (fixes applied per reuse/quality/efficiency, skipped count, verification result) |
 | What's next | Open the PR via `/ce-commit-push-pr` |
 
 ---
