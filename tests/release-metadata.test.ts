@@ -61,6 +61,10 @@ async function makeFixtureRoot(): Promise<string> {
     ),
   )
   await writeFile(
+    path.join(root, "gemini-extension.json"),
+    JSON.stringify({ version: "2.42.0" }, null, 2),
+  )
+  await writeFile(
     path.join(root, ".agents", "plugins", "marketplace.json"),
     JSON.stringify(
       {
@@ -152,6 +156,33 @@ describe("release metadata", () => {
     // release-please owns version writes via extra-files; syncReleaseMetadata detects but does not correct.
     const afterContents = JSON.parse(await Bun.file(codexPath).text())
     expect(afterContents.version).toBe("2.41.0")
+  })
+
+  test("reports Gemini extension version drift without auto-correcting", async () => {
+    const root = await makeFixtureRoot()
+    await writeFile(
+      path.join(root, "gemini-extension.json"),
+      JSON.stringify({ version: "2.41.0" }, null, 2),
+    )
+
+    const result = await syncReleaseMetadata({ root, write: true })
+    const geminiPath = path.join(root, "gemini-extension.json")
+    const geminiUpdate = result.updates.find((u) => u.path === geminiPath)
+
+    expect(geminiUpdate).toBeDefined()
+    expect(geminiUpdate!.changed).toBe(true)
+
+    const afterContents = JSON.parse(await Bun.file(geminiPath).text())
+    expect(afterContents.version).toBe("2.41.0")
+  })
+
+  test("reports missing Gemini extension manifest as a structural error", async () => {
+    const root = await makeFixtureRoot()
+    await Bun.$`rm ${path.join(root, "gemini-extension.json")}`.quiet()
+
+    const result = await syncReleaseMetadata({ root, write: false })
+
+    expect(result.errors.some((err) => err.includes("gemini-extension.json is missing"))).toBe(true)
   })
 
   test("rewrites Codex plugin.json description on write when drifted from Claude", async () => {

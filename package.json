@@ -18,6 +18,7 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "convert": "bun run src/index.ts convert",
+    "cleanup": "bun run src/index.ts cleanup",
     "list": "bun run src/index.ts list",
     "cli:install": "bun run src/index.ts install",
     "test": "bun test",

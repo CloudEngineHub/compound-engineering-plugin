@@ -265,6 +265,15 @@ Marketplace-managed installs should move to the root plugin layout when the mark
 
 A plugin update by itself can still read the stale cached marketplace entry that points at the old `plugins/compound-engineering` path. If you configured a host with a direct path or sparse path under `plugins/compound-engineering`, edit or reinstall that source so it points at the repository root with no sparse path.
 
+If a previous Bun-installed copy is still shadowing native plugin skills, run the current cleanup command from a checkout of this repository:
+
+```bash
+git clone https://github.com/EveryInc/compound-engineering-plugin.git /tmp/compound-engineering-plugin-cleanup
+cd /tmp/compound-engineering-plugin-cleanup
+bun install
+bun run cleanup --target all
+```
+
 ---
 
 ## Local Development

@@ -22,6 +22,10 @@ type CodexPluginManifest = {
   skills?: string
 }
 
+type GeminiExtensionManifest = {
+  version: string
+}
+
 type MarketplaceManifest = {
   metadata: {
     version: string
@@ -160,6 +164,7 @@ export async function syncReleaseMetadata(options: SyncOptions = {}): Promise<Me
 
   const compoundClaudePath = path.join(root, ".claude-plugin", "plugin.json")
   const compoundCursorPath = path.join(root, ".cursor-plugin", "plugin.json")
+  const compoundGeminiPath = path.join(root, "gemini-extension.json")
   const marketplaceClaudePath = path.join(root, ".claude-plugin", "marketplace.json")
   const marketplaceCursorPath = path.join(root, ".cursor-plugin", "marketplace.json")
 
@@ -195,6 +200,23 @@ export async function syncReleaseMetadata(options: SyncOptions = {}): Promise<Me
   }
   updates.push({ path: compoundCursorPath, changed })
   if (write && changed) await writeJson(compoundCursorPath, compoundCursor)
+
+  // Gemini extension version sync is detect-only. release-please owns the
+  // write via extra-files, same as the Codex native plugin manifest.
+  try {
+    const compoundGemini = await readJson<GeminiExtensionManifest>(compoundGeminiPath)
+    updates.push({
+      path: compoundGeminiPath,
+      changed: compoundGemini.version !== expectedCompoundVersion,
+    })
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      errors.push(`${compoundGeminiPath} is missing but ${compoundClaudePath} exists. Gemini extension parity required.`)
+      updates.push({ path: compoundGeminiPath, changed: false })
+    } else {
+      throw err
+    }
+  }
 
   changed = false
   if (versions.marketplace && marketplaceClaude.metadata.version !== versions.marketplace) {
