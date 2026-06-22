@@ -235,13 +235,19 @@ describe("ce-plan post-generation menu routing", () => {
       ).toBe(false)
     })
 
-    test("no-config prompt offers a path beyond GitHub/Linear", () => {
-      // The blocking-question options in the no-config branch must include an
-      // Other path so a Jira (or any) project isn't locked out of issue creation.
+    test("no-config prompt routes other trackers via free-form, not a 4th explicit option", () => {
+      // Non-GitHub/Linear trackers must not be locked out, but the path is the
+      // blocking tool's built-in free-form/Other input — not an explicit fourth
+      // `Other` option, which is redundant where the tool already offers free-form
+      // and exceeds the 2-3 explicit-option cap on Codex `request_user_input`.
       expect(
-        /Options:[^\n]*`Other`/.test(ISSUE_CREATION_SECTION),
-        "Issue Creation no-config prompt must offer an `Other` option so non-GitHub/Linear trackers can be selected.",
+        /free-form|different tracker|another tracker|other-tracker/i.test(ISSUE_CREATION_SECTION),
+        "Issue Creation no-config prompt must let the user reach a non-GitHub/Linear tracker via the tool's free-form path.",
       ).toBe(true)
+      expect(
+        /Options:[^\n]*`Other`|`Linear`,\s*`Other`/.test(ISSUE_CREATION_SECTION),
+        "Issue Creation no-config prompt must NOT add an explicit fourth `Other` option (redundant + exceeds Codex's explicit-option cap); rely on the tool's built-in free-form input.",
+      ).toBe(false)
     })
 
     // Codex review of PR #971 (P3): the inline SKILL.md routing caches at session
