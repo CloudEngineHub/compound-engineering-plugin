@@ -318,17 +318,22 @@ def _pi_context_objects(objects):
     if not isinstance(first_kept, str):
         return active
 
+    latest_compaction_id = compactions[-1].get("id")
     started = False
-    context = []
+    found_first_kept = False
+    context = [obj for obj in active if obj.get("type") == "session"]
+    context.append(compactions[-1])
     for obj in active:
         if obj.get("type") == "session":
-            context.append(obj)
             continue
         if obj.get("id") == first_kept:
             started = True
+            found_first_kept = True
+        if obj.get("id") == latest_compaction_id:
+            continue
         if started:
             context.append(obj)
-    return context if len(context) > 1 else active
+    return context if found_first_kept and len(context) > 1 else active
 
 
 def handle_pi(obj):

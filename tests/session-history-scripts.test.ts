@@ -1001,6 +1001,9 @@ describe("extract-skeleton", () => {
     expect(stdout).toContain("kept_after_compaction_keyword")
     expect(stdout).not.toContain("old_compacted_keyword")
     expect(stdout).not.toContain("old-compacted.test.ts")
+    expect(stdout.indexOf("compaction_summary_keyword")).toBeLessThan(
+      stdout.indexOf("kept_after_compaction_keyword")
+    )
   })
 
   test("extracts Pi custom-role messages in skeleton output", async () => {
