@@ -124,8 +124,9 @@ export function isSafeManagedPath(rootDir: string, candidate: unknown): candidat
 
 /**
  * Normalizes a command name to the relative path key used by the OpenCode writer,
- * without touching the filesystem. Colons become path separators, matching the
- * `name.split(":")` logic in `writeOpenCodeBundle`.
+ * without touching the filesystem, by applying the colon-to-slash convention.
+ * See also `resolveCommandPath`, which applies the same split but resolves to an
+ * absolute path and creates intermediate directories on disk.
  *
  * Example: `"foo:bar"` -> `"foo/bar"`
  */

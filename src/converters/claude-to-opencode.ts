@@ -96,10 +96,8 @@ export function convertClaudeToOpenCode(
   // commands/foo/bar.md, so they must be treated as the same command here.
   const explicitCommands = convertCommands(plugin.commands)
   const explicitCommandPaths = new Set(explicitCommands.map((c) => commandNameToRelativePath(c.name)))
-  // Also deduplicate skill stubs against each other by normalized path: two
-  // skills whose names normalize to the same path (e.g. "foo:bar" vs "foo/bar",
-  // or duplicate name frontmatter across skill dirs) would both write to the
-  // same commands/foo/bar.md. Keep only the first occurrence.
+  // Also deduplicate stubs against each other by normalized path, in case two
+  // skills resolve to the same commands/<path>.md. Keep the first occurrence.
   const seenStubPaths = new Set<string>()
   const skillStubs = convertSkillsToCommands(openCodeSkills).filter((stub) => {
     const normalizedPath = commandNameToRelativePath(stub.name)
@@ -436,7 +434,7 @@ function applyPermissions(
       // least loads; warn so the user can pick `none`/`broad` if their skills
       // need to act. (The default install mode is `none`, which writes no
       // permission block and is unaffected.)
-      if (enabled.size === 1) {
+      if (enabled.size === 1 && enabled.has("skill")) {
         console.warn(
           "Warning: --permissions from-commands restricts tools to those declared by explicit commands, " +
             "but this plugin's slash commands are skill stubs with no declared tools. The stubs can load " +
