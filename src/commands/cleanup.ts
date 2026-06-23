@@ -187,7 +187,7 @@ async function cleanupTarget(
     case "kiro":
       return [await cleanupKiro(plugin, roots.kiroHome)]
     case "copilot": {
-      // Same race-prevention as Gemini: if a user points `--copilot-home`,
+      // Same race-prevention as Copilot below: if a user points `--copilot-home`,
       // `--output`, or `--agents-home` at the same directory these parallel
       // passes collide on renames. Default values are distinct so the dedup
       // is mostly defensive, but keep the shape consistent across targets
@@ -202,7 +202,7 @@ async function cleanupTarget(
     case "qwen":
       return [await cleanupQwen(plugin, roots.qwenHome)]
     case "windsurf": {
-      // Same race-prevention as Gemini/Copilot: dedup after path resolution
+      // Same race-prevention as Copilot: dedup after path resolution
       // so overlapping overrides can't produce concurrent renames on the
       // same directory.
       const rootsToClean = roots.hasExplicitOutput

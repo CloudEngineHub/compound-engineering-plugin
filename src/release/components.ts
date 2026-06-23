@@ -27,7 +27,7 @@ const FILE_COMPONENT_MAP: Array<{ component: ReleaseComponent; prefixes: string[
       "AGENTS.md",
       "CLAUDE.md",
       ".agy/",
-      "GEMINI.md",
+      "GEMINI.md", // retained: agy still reads the Gemini-format context file
       "README.md",
       "package.json",
       "src/",

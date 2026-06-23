@@ -157,7 +157,7 @@ export function toToml(description: string, prompt: string): string {
   const lines: string[] = []
   lines.push(`description = ${formatTomlString(description)}`)
 
-  // Use multi-line string for prompt
+  // Multi-line basic string avoids escaping embedded newlines in prompt text
   const escapedPrompt = prompt.replace(/\\/g, "\\\\").replace(/"""/g, '\\"\\"\\"')
   lines.push(`prompt = """`)
   lines.push(escapedPrompt)
