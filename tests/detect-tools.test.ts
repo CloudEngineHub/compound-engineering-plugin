@@ -47,7 +47,7 @@ describe("detectInstalledTools", () => {
 
     const results = await detectInstalledTools(tempHome, tempCwd)
 
-    expect(results.length).toBe(7)
+    expect(results.length).toBe(8)
     for (const tool of results) {
       expect(tool.detected).toBe(false)
       expect(tool.reason).toBe("not found")
@@ -67,6 +67,24 @@ describe("detectInstalledTools", () => {
     expect(results.find((t) => t.name === "opencode")?.detected).toBe(true)
     expect(results.find((t) => t.name === "droid")?.detected).toBe(true)
     expect(results.find((t) => t.name === "pi")?.detected).toBe(true)
+  })
+
+  test("detects antigravity at ~/.gemini/antigravity-cli", async () => {
+    const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "detect-agy-home-"))
+    const tempCwd = await fs.mkdtemp(path.join(os.tmpdir(), "detect-agy-cwd-"))
+    await fs.mkdir(path.join(tempHome, ".gemini", "antigravity-cli"), { recursive: true })
+
+    const results = await detectInstalledTools(tempHome, tempCwd)
+    expect(results.find((t) => t.name === "antigravity")?.detected).toBe(true)
+  })
+
+  test("detects antigravity at workspace .agy", async () => {
+    const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "detect-agy-home2-"))
+    const tempCwd = await fs.mkdtemp(path.join(os.tmpdir(), "detect-agy-cwd2-"))
+    await fs.mkdir(path.join(tempCwd, ".agy"), { recursive: true })
+
+    const results = await detectInstalledTools(tempHome, tempCwd)
+    expect(results.find((t) => t.name === "antigravity")?.detected).toBe(true)
   })
 
   describe("opencode OPENCODE_CONFIG_DIR", () => {

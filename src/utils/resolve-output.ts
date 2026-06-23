@@ -18,6 +18,10 @@ export function resolveTargetOutputRoot(options: {
     const base = hasExplicitOutput ? outputRoot : process.cwd()
     return path.join(base, ".gemini")
   }
+  if (targetName === "antigravity") {
+    const base = hasExplicitOutput ? outputRoot : process.cwd()
+    return path.join(base, ".agy")
+  }
   if (targetName === "kiro") {
     const base = hasExplicitOutput ? outputRoot : process.cwd()
     return path.join(base, ".kiro")
