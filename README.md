@@ -57,7 +57,7 @@ For the full catalog and how each skill chains together, see [docs/skills](docs/
 **Finding a direction** -- when you don't have a specific idea yet, ideate first, then carry the strongest survivor into the loop:
 
 ```text
-/ce-ideate "new drawing tools"
+/ce-ideate new drawing tools
 /ce-ideate github issues   # ground ideas in your open issues instead of a prompt
 ```
 
@@ -66,7 +66,7 @@ For the full catalog and how each skill chains together, see [docs/skills](docs/
 **Standard feature loop** -- turn a rough idea into shipped, reviewed code:
 
 ```text
-/ce-brainstorm "make background job retries safer"
+/ce-brainstorm make background job retries safer
 /ce-plan
 /ce-work
 /ce-simplify-code
@@ -78,7 +78,7 @@ For the full catalog and how each skill chains together, see [docs/skills](docs/
 
 ```text
 /ce-simplify-code
-/ce-simplify-code "simplify the code in my most-churned file"
+/ce-simplify-code simplify the code in my most-churned file
 ```
 
 The first pass tightens recent branch changes before review. The targeted pass is useful when one file keeps absorbing unrelated fixes, follow-ups, or merge conflicts.
@@ -86,7 +86,7 @@ The first pass tightens recent branch changes before review. The targeted pass i
 **Debugging a bug** -- when you start from broken behavior instead of a feature:
 
 ```text
-/ce-debug "the checkout webhook sometimes creates duplicate invoices"
+/ce-debug the checkout webhook sometimes creates duplicate invoices
 /ce-code-review
 /ce-compound
 ```
@@ -94,7 +94,7 @@ The first pass tightens recent branch changes before review. The targeted pass i
 **Autonomous** -- hand off a feature and let the agent run the whole pipeline:
 
 ```text
-/ce-brainstorm "describe the feature"
+/ce-brainstorm describe the feature
 /lfg
 ```
 
