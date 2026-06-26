@@ -170,6 +170,12 @@ native equivalent — use a table with the data and let prose or caption
 carry the interpretation. The richer visualization happens in the HTML
 rendering.
 
+For a **UI/layout shape** that would be a wireframe in HTML, markdown has
+no inline-SVG wireframe affordance. Render the region composition as a
+mermaid layout `flowchart` (or describe it in prose) — never hand-draw a
+box-drawing/ASCII wireframe; it violates the no-box-drawing-characters rule
+and reads poorly. The wireframe proper is an HTML-only affordance.
+
 ## Inline code and code blocks
 
 - **Inline code** for identifiers (variable names, function names,

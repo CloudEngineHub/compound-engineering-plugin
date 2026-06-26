@@ -382,8 +382,8 @@ relationships, a topology diagram; if it's process flow across
 participants, a swim lane; etc.
 
 **Conceptual diagrams are not wireframes.** The wireframe affordance below
-is scoped to brainstorm requirements docs about *visual products* and is
-excluded for non-visual systems. That exclusion is about wireframes only —
+is scoped to *UI-shaped requirements* and is excluded for non-visual
+systems. That exclusion is about wireframes only —
 a brainstorm about a data model, schema, agent workflow, or migration is
 still free to use a conceptual diagram (a before/after field map, a
 source-of-truth fan-out, a state diagram). Don't let the wireframe
@@ -465,12 +465,17 @@ caption because the wireframe is explicitly NOT a spec.
 
 ## Wireframe mockups (requirements docs only)
 
-When a brainstorm requirements document describes a user-facing visual
-surface (UI feature, screen layout, screen flow, component placement),
-the HTML rendering may include a wireframe mockup. This affordance applies
-ONLY to brainstorm requirements docs that describe visual products — not
-to plan artifacts, and not to brainstorms about non-visual systems (API
-design, agent workflows, infrastructure).
+When a brainstorm requirement describes a user-facing visual surface (UI
+feature, screen layout, screen flow, component placement), the HTML
+rendering may include a wireframe mockup. The trigger is the
+**requirement**, not the document: any requirement (or requirements group)
+with a UI/layout shape can carry a wireframe, whether or not the brainstorm
+as a whole is "a visual product" — a backend-heavy brainstorm with one
+screen change still earns a wireframe for that requirement. It still applies
+only to brainstorm requirements docs (not plan artifacts), and only to
+UI-shaped requirements — a non-visual requirement (API design, data model,
+agent workflow, infrastructure) takes a conceptual diagram instead, not a
+wireframe.
 
 When a wireframe is included:
 

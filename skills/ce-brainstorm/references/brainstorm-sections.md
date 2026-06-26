@@ -174,20 +174,28 @@ worse than omitting it.
   together prevent downstream invention of paths. When omitting from a
   behavioral brainstorm, note the reason in the doc.
 
-- **Visualizations** — include a diagram when the brainstorm contains a
-  diagram-shaped concept that a picture carries faster than prose. Common
-  shapes: a data-shape transformation (before/after schema or field
-  mapping), a source-of-truth fan-out (one authority feeding many derived
-  surfaces), state-or-lifecycle logic, a multi-step flow, or a quantitative
-  comparison. A diagram is cross-cutting, not a section of its own — it sits
-  next to the Key Decision, Requirements group, or Flow it illustrates. The
-  named test: *does the picture let a reader grasp the concept faster than
-  the paragraph alone?* If yes, add it; if the prose already conveys it at a
-  glance, skip it. One diagram per load-bearing concept — don't add visuals
-  for ceremony. This affordance is the conceptual-diagram path; it is
-  distinct from the wireframe affordance (a wireframe is for visual-product
-  UI and does not apply to non-visual systems like data models or agent
-  workflows, but a conceptual diagram does).
+- **Visualizations** — a brainstorm earns a visual when a concept has a
+  **structure worth showing**, and that decision turns on whether the
+  structure exists, *not* on whether your own prose reads clearly. Calling
+  your prose "clear enough" is the trap that quietly under-produces the
+  visuals a reader actually uses — decide on the shape, not the wording.
+  Shapes that warrant one: a data-shape transformation (before/after schema
+  or field mapping), a source-of-truth fan-out (one authority feeding many
+  derived surfaces), state-or-lifecycle logic, a multi-step flow, an
+  entity/relationship structure, a decision boundary, a quantitative
+  comparison — and, for any requirement that changes a UI, screen layout,
+  component placement, or screen flow, a **wireframe**. This applies to
+  backend and conceptual work, not only visual products: a data model, sync
+  protocol, or agent workflow earns a conceptual diagram exactly as a UI
+  requirement earns a wireframe. Match the visual to the shape — a UI/layout
+  shape takes a wireframe in HTML (a mermaid layout diagram or prose in
+  markdown; there is no inline-SVG wireframe in markdown), any other structure
+  takes a conceptual diagram. A visual is cross-cutting, not a section of its
+  own — it sits next to the Key Decision, Requirements group, or Flow it
+  illustrates. **A point with nothing structural to show gets no visual** — a
+  single-field add, a rename, or a one-line change has no structure, and a
+  before/after of one changed line is decoration. One visual per load-bearing
+  concept, never decoration or ceremony.
 
   **Diagrams complement prose; they never replace it.** A diagram is an
   on-ramp to the prose it illustrates, not a substitute. The IDed prose
