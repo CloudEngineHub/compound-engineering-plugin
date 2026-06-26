@@ -43,7 +43,7 @@ bash "$SKILL_DIR/scripts/cross-model-adversarial-review.sh" "<peer>" "<base-ref>
 - `<base-ref>` = the Stage 1 `BASE` (the diff base the peer reviews via `git diff <base-ref>`).
 - `<run-dir>` = the Stage 4 run dir (`/tmp/compound-engineering/ce-code-review/<run-id>/`). The script writes `adversarial-<peer>.json` there.
 
-Set the Bash tool `timeout` to `360000` (6 min) — the script self-bounds at 300s (`CROSS_MODEL_HARD_SECS`) via `gtimeout`/`timeout` and exits cleanly. If the harness can't background a shell command, run it inline before awaiting the reviewers; correctness is unaffected, only wall-clock. The script needs no prompt or schema passed in — it reads the persona brief and `findings-schema.json` itself from the skill dir.
+Set the Bash tool `timeout` to `660000` (11 min) — the script self-bounds via `gtimeout`/`timeout` (codex idle-timeout, default-120s stall; hard backstop `CROSS_MODEL_HARD_SECS`, default 600s) and exits cleanly. If the harness can't background a shell command, run it inline before awaiting the reviewers; correctness is unaffected, only wall-clock. The script needs no prompt or schema passed in — it reads the persona brief and `findings-schema.json` itself from the skill dir.
 
 ## Step 4 — Fold into Stage 5
 
@@ -60,4 +60,4 @@ Set the Bash tool `timeout` to `360000` (6 min) — the script self-bounds at 30
 - Codex peer: `codex exec - -s read-only -o <out>` at high reasoning effort. No `--output-schema` (Codex strict mode rejects the permissive draft-07 schema); the full schema embedded in the prompt is its only contract, which produces complete schema-shaped findings (verified).
 - Claude peer: `claude -p --permission-mode dontAsk --disallowedTools Edit Write NotebookEdit --json-schema … --output-format json` (disallowed tools passed as separate variadic args, not one quoted string), captured from stdout (it can't write a file under those permissions), parsed via `.structured_output` with a `.result` fallback.
 - Read-only differs by peer: codex `-s read-only` is a hard sandbox; claude `dontAsk` is permission-gated (only read-only Bash + allow-rules run). Non-blocking everywhere: any gap → log + exit 0, no output file.
-- Both peers run in the **foreground under `gtimeout`/`timeout`** (kills the whole process tree on expiry — no orphaned model call can outlive the script and write after Stage 5 skipped it). Hard cap tunable via `CROSS_MODEL_HARD_SECS` (default 300).
+- Timeouts kill the whole **process tree** (under `gtimeout`/`timeout`, forwarded on expiry or external signal), so no orphaned model call outlives the script. **Codex** streams its reasoning, so it gets an **idle-timeout** — killed only when output stalls for `CROSS_MODEL_IDLE_SECS` (default 120s), letting a productive long run continue — with a hard backstop `CROSS_MODEL_HARD_SECS` (default 600s). **Claude**'s `--output-format json` is single-shot, so it gets the hard cap only.
