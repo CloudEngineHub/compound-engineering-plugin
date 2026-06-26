@@ -118,8 +118,30 @@ case "$PEER" in
     else
       perl -e 'alarm shift; exec @ARGV' "$HARD_SECS" \
         codex exec - -C "$REPO_ROOT" -s read-only -o "$OUT" \
-        -c 'model_reasoning_effort="high"' < "$PROMPT_FILE" >/dev/null 2>&1 \
+        -c 'model_reasoning_effort="high"' < "$PROMPT_FILE" > "$PEERLOG" 2>&1 \
         || log "codex exited non-zero or timed out"
+    fi
+    # Fallback: codex's -o write is CLI-level and works under -s read-only, but if it
+    # ever fails to materialize, recover the same JSON from the stdout we already
+    # captured (codex prints the final message to stdout too). Belt-and-suspenders.
+    if { [ ! -s "$OUT" ] || ! jq -e . "$OUT" >/dev/null 2>&1; } && [ -s "$PEERLOG" ] && command -v python3 >/dev/null 2>&1; then
+      python3 - "$PEERLOG" "$OUT" <<'PY' 2>/dev/null && [ -s "$OUT" ] && log "recovered codex JSON from stdout (-o file unavailable)"
+import sys, json
+txt = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+best, depth, start = None, 0, None
+for i, ch in enumerate(txt):
+    if ch == '{':
+        if depth == 0: start = i
+        depth += 1
+    elif ch == '}' and depth > 0:
+        depth -= 1
+        if depth == 0 and start is not None:
+            try:
+                obj = json.loads(txt[start:i+1])
+                if isinstance(obj, dict) and "findings" in obj: best = obj
+            except Exception: pass
+if best is not None: open(sys.argv[2], "w").write(json.dumps(best))
+PY
     fi
     ;;
   claude)
