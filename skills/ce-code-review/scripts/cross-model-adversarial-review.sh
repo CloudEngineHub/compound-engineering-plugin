@@ -78,33 +78,57 @@ else
 fi
 
 # --- run the peer: idle-timeout for streaming codex, hard cap for claude ----
-# We don't kill codex on a fixed wall clock: codex exec streams its reasoning to
-# stdout, so a productive long run is allowed to continue and is killed only when its
-# output STALLS for IDLE_SECS (the cross-model "second opinion" idle-timeout pattern).
-# claude's --output-format json is single-shot (no incremental output), so it gets a
-# hard cap only.
+# codex exec streams its reasoning to stdout, so a productive long run is allowed to
+# continue and is killed only when its output STALLS for IDLE_SECS (the cross-model
+# "second opinion" idle-timeout pattern), with HARD_SECS as an absolute backstop.
+# claude's --output-format json is single-shot, so it gets a hard cap only.
 #
-# Orphan safety: the peer runs under gtimeout/timeout, which kills the whole process
-# tree -- both on its own hard cap AND when we signal it externally on idle (verified:
-# an external kill of (g)timeout is forwarded to its child). No backgrounded model call
-# can outlive this script. perl(alarm) is the fallback when neither (g)timeout exists
-# (hard cap, no idle detection).
+# Orphan safety: codex runs in its OWN process group (set -m) and the watchdog reaps the
+# whole group (TERM then KILL) on idle/hard -- we do NOT signal a (g)timeout wrapper for
+# this, because an external kill of (g)timeout forwards only TERM (its -k escalates only
+# on gtimeout's OWN expiry), so a peer that defers SIGTERM could survive `wait` and write
+# $OUT after Stage 5 skipped it. claude keeps the (g)timeout wrapper: it is single-shot
+# and gtimeout's own timeout (with -k) escalates to KILL correctly; perl(alarm) is the
+# fallback when neither (g)timeout exists.
 IDLE_SECS="${CROSS_MODEL_IDLE_SECS:-120}"   # kill codex if its streamed output stalls this long
 HARD_SECS="${CROSS_MODEL_HARD_SECS:-600}"   # absolute ceiling (backstop) for either peer
 TO_BIN="$(command -v gtimeout || command -v timeout || true)"
 
-# Codex under (g)timeout in the background; stream to PEERLOG; kill on idle stall.
-run_codex_idle() {
-  "$TO_BIN" -k 10 "$HARD_SECS" codex exec - -C "$REPO_ROOT" -s read-only -o "$OUT" \
+# Reap a backgrounded job's whole process group: TERM, then KILL after a short grace if
+# anything is still alive. The grace loop tests GROUP liveness (kill -0 on the negative
+# pgid), not just the leader pid -- otherwise a leader that exits while a child defers TERM
+# would let reap() return before the group KILL, leaking the child. Falls back to the bare
+# pid only when group signaling isn't accepted at all.
+reap() {
+  local pid="$1" grp
+  if kill -TERM -- -"$pid" 2>/dev/null; then grp=1; else kill -TERM "$pid" 2>/dev/null; grp=0; fi
+  for _ in 1 2 3 4 5; do
+    if [ "$grp" = 1 ]; then kill -0 -- -"$pid" 2>/dev/null || return 0
+    else kill -0 "$pid" 2>/dev/null || return 0; fi
+    sleep 1
+  done
+  if [ "$grp" = 1 ]; then kill -KILL -- -"$pid" 2>/dev/null; else kill -KILL "$pid" 2>/dev/null; fi
+}
+
+# Run codex in its own process group; stream to PEERLOG; reap the group on idle stall or
+# hard cap. This watchdog owns both bounds and the kill -- no (g)timeout wrapper to signal.
+run_codex() {
+  local prev; case "$-" in *m*) prev=1;; *) prev=0;; esac
+  set -m   # background job becomes a process-group leader (pgid == pid) so reap() kills the tree
+  codex exec - -C "$REPO_ROOT" -s read-only -o "$OUT" \
     -c 'model_reasoning_effort="high"' < "$PROMPT_FILE" > "$PEERLOG" 2>&1 &
-  local pid=$! last=-1 lastchg now size
-  lastchg="$(date +%s)"
+  local pid=$!
+  [ "$prev" = 0 ] && set +m   # group is already assigned; restoring silences job-control noise
+  local start last=-1 lastchg now size
+  start="$(date +%s)"; lastchg="$start"
   while kill -0 "$pid" 2>/dev/null; do
     sleep 5; now="$(date +%s)"; size="$(wc -c <"$PEERLOG" 2>/dev/null || echo 0)"
-    if [ "$size" != "$last" ]; then last="$size"; lastchg="$now"; fi
+    [ "$size" != "$last" ] && { last="$size"; lastchg="$now"; }
     if [ $(( now - lastchg )) -ge "$IDLE_SECS" ]; then
-      log "codex output idle ${IDLE_SECS}s; killing (forwarded to the process tree)"
-      kill "$pid" 2>/dev/null; break
+      log "codex output idle ${IDLE_SECS}s; reaping peer process group"; reap "$pid"; break
+    fi
+    if [ $(( now - start )) -ge "$HARD_SECS" ]; then
+      log "codex exceeded hard cap ${HARD_SECS}s; reaping peer process group"; reap "$pid"; break
     fi
   done
   wait "$pid" 2>/dev/null || true
@@ -113,14 +137,7 @@ run_codex_idle() {
 log "running $PEER adversarial review against base $BASE (read-only; idle ${IDLE_SECS}s / hard ${HARD_SECS}s)"
 case "$PEER" in
   codex)
-    if [ -n "$TO_BIN" ]; then
-      run_codex_idle
-    else
-      perl -e 'alarm shift; exec @ARGV' "$HARD_SECS" \
-        codex exec - -C "$REPO_ROOT" -s read-only -o "$OUT" \
-        -c 'model_reasoning_effort="high"' < "$PROMPT_FILE" > "$PEERLOG" 2>&1 \
-        || log "codex exited non-zero or timed out"
-    fi
+    run_codex
     # Fallback: codex's -o write is CLI-level and works under -s read-only, but if it
     # ever fails to materialize, recover the same JSON from the stdout we already
     # captured (codex prints the final message to stdout too). Belt-and-suspenders.
