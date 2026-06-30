@@ -245,8 +245,10 @@ Each guard is an explicit conditional in SKILL.md, not implicit. R2 solo does NO
 
 **Confirmation template (fires for Standard/Deep regardless of call-out count, or for any tier with one or more call-outs surviving):**
 
+The opener defaults to "Based on your request" — add "and our brief discussion" only when the Phase 0.4 bootstrap actually involved back-and-forth clarifying questions. Solo invocations often proceed with no dialogue, and claiming a discussion the user didn't have reads as off.
+
 ```
-Based on your request and our brief discussion, here's the scope I'm proposing to plan against:
+Based on your request, here's the scope I'm proposing to plan against:
 
 [scope claim — what the plan will target, what it will not; affirm-or-redirect level; NOT an enumeration of Implementation Units]
 
