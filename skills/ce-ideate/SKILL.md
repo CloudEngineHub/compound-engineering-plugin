@@ -25,7 +25,7 @@ Ask one question at a time. Prefer concise single-select choices when natural op
 
 ## Focus Hint
 
-<focus_hint> #$ARGUMENTS </focus_hint>
+The **focus hint** is any optional context this skill was invoked with — present in the current prompt or conversation, whether the user gave it directly or a calling skill passed it. The rest of this skill refers to it as `{focus_hint}` (empty if none was given).
 
 Interpret any provided argument as optional context. It may be:
 
