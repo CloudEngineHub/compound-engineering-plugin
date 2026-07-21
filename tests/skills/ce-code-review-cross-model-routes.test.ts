@@ -15,6 +15,10 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 const tempRoots: string[] = []
+const REPO_ROOT = path.join(__dirname, "../..")
+const DIRTY_MARKER = path.join(REPO_ROOT, ".xmodel-cr-test-dirty")
+const DIRTY_MARKER_REL = ".xmodel-cr-test-dirty"
+let dirtyTreeStaged = false
 function mkTempRoot(prefix: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), prefix))
   tempRoots.push(dir)
@@ -22,6 +26,11 @@ function mkTempRoot(prefix: string): string {
 }
 afterAll(() => {
   for (const dir of tempRoots) rmSync(dir, { recursive: true, force: true })
+  if (dirtyTreeStaged || existsSync(DIRTY_MARKER)) {
+    spawnSync("git", ["reset", "HEAD", "--", DIRTY_MARKER_REL], { cwd: REPO_ROOT })
+    if (existsSync(DIRTY_MARKER)) rmSync(DIRTY_MARKER, { force: true })
+    dirtyTreeStaged = false
+  }
 })
 
 const REAL_TOOLS = [
@@ -116,12 +125,26 @@ function makeRunDir(): string {
   return mkTempRoot("xmodel-cr-run-")
 }
 
+/** Stage a fixture file so `git diff --quiet HEAD --` sees changes (untracked alone is ignored). */
+function ensureDirtyTree(cwd: string): void {
+  if (cwd !== REPO_ROOT) return
+  writeFileSync(DIRTY_MARKER, `fixture ${Date.now()}\n`)
+  const r = spawnSync("git", ["add", "--", DIRTY_MARKER_REL], { cwd: REPO_ROOT })
+  if (r.status === 0) dirtyTreeStaged = true
+}
+
 /** Run the script and return exit code, stdout, stderr, and run-dir file list. */
 function run(
   args: string[],
   runDir: string,
   env: NodeJS.ProcessEnv = process.env,
+  cwd = REPO_ROOT, // repo root — script needs git
+  opts: { skipDirtyTree?: boolean } = {},
 ) {
+  const baseRef = args[2]
+  if (!opts.skipDirtyTree && baseRef === "HEAD" && cwd === REPO_ROOT) {
+    ensureDirtyTree(cwd)
+  }
   const effectiveEnv = { ...env }
   if (!("CROSS_MODEL_DRY_RUN" in effectiveEnv) && !("CROSS_MODEL_FIXED_ROUTE" in effectiveEnv)) {
     const target = args[1]
@@ -137,7 +160,7 @@ function run(
   const r = spawnSync("bash", [SCRIPT, ...args], {
     encoding: "utf8",
     env: effectiveEnv,
-    cwd: path.join(__dirname, "../.."), // repo root — script needs git
+    cwd,
   })
   return {
     code: r.status ?? -1,
@@ -436,6 +459,42 @@ describe("cross-model-adversarial-review skip paths — non-blocking, no file", 
     const runDir = makeRunDir()
     expect(run(["claude", "codex", "", runDir], runDir, env).code).toBe(0)
     expect(run(["claude", "codex", "HEAD", "/no/such/run-dir"], runDir, env).files).toHaveLength(0)
+  })
+
+  test("unresolvable base ref skips at diff staging (no output file)", () => {
+    const { env } = sandbox(
+      ["claude"],
+      "#!/bin/sh\ncat >/dev/null\nprintf '%s' '{\"structured_output\":{\"reviewer\":\"adversarial\",\"findings\":[{\"title\":\"confabulated\"}]}}'\n",
+    )
+    const runDir = makeRunDir()
+    const r = run(["codex", "claude", "no-such-ref-1193", runDir], runDir, env)
+    expect(r.code).toBe(0)
+    expect(r.files).toHaveLength(0)
+    // git diff against an unresolvable ref exits non-zero -> the staging guard skips.
+    expect(r.stderr).toContain("cannot stage reviewed diff")
+  })
+
+  test("empty working-tree diff skips before peer invoke", () => {
+    const repo = mkTempRoot("xmodel-cr-empty-")
+    spawnSync("git", ["init", "-b", "main"], { cwd: repo })
+    spawnSync("git", ["config", "user.email", "test@test"], { cwd: repo })
+    spawnSync("git", ["config", "user.name", "test"], { cwd: repo })
+    writeFileSync(path.join(repo, "f"), "x")
+    spawnSync("git", ["add", "f"], { cwd: repo })
+    spawnSync("git", ["commit", "-m", "init"], { cwd: repo })
+    const invoked = path.join(mkTempRoot("xmodel-cr-empty-invoked-"), "marker")
+    const { env } = sandbox(
+      ["claude"],
+      `#!/bin/sh\n: > '${invoked}'\ncat >/dev/null\nprintf '%s' '{"structured_output":{"reviewer":"adversarial","findings":[{"title":"confabulated"}]}}'\n`,
+    )
+    const runDir = makeRunDir()
+    const r = run(["codex", "claude", "HEAD", runDir], runDir, env, repo, {
+      skipDirtyTree: true,
+    })
+    expect(existsSync(invoked)).toBe(false)
+    expect(r.code).toBe(0)
+    expect(r.files).toHaveLength(0)
+    expect(r.stderr).toContain("no changes between 'HEAD' and the working tree")
   })
 
   test("surfaces short provider errors without dropping the diagnostic", () => {
