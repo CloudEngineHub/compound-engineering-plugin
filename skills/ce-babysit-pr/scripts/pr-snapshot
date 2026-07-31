@@ -659,7 +659,7 @@ def fetch(pr, repo):
     """Fetch both event streams via gh into one combined snapshot dict."""
     repo_args = ["--repo", repo] if repo else []
     view = _run_checked(["gh", "pr", "view", str(pr), *repo_args, "--json",
-                         "state,mergeable,mergeStateStatus,reviewDecision,headRefOid,baseRefOid,baseRefName,headRefName,url,number,"
+                         "state,mergeable,mergeStateStatus,reviewDecision,headRefOid,baseRefOid,baseRefName,headRefName,url,number,isDraft,"
                          "statusCheckRollup,author,comments,reviews"],
                         "gh pr view")
     v = json.loads(view.stdout)
@@ -715,6 +715,7 @@ def fetch(pr, repo):
     head = v.get("headRefOid")
     return {
         "pr_state": v.get("state"),
+        "pr_is_draft": v.get("isDraft"),
         "mergeable": v.get("mergeable"),
         "merge_state_status": v.get("mergeStateStatus"),
         "review_decision": v.get("reviewDecision") or None,
@@ -1422,6 +1423,7 @@ def diff(state, cur, now=None, advance_trajectory=True):
 
     return {
         "pr_state": cur["pr_state"],
+        "pr_is_draft": cur.get("pr_is_draft"),
         "mergeable": cur["mergeable"],
         "merge_state_status": cur["merge_state_status"],
         "review_decision": cur["review_decision"],
@@ -2303,9 +2305,34 @@ def cmd_mark(args):
     print(json.dumps({"marked": args.currency_key or args.check or args.thread or args.comment}))
 
 
+WATCH_BOOTSTRAP_FLAGS = ("--state-dir", "--invocation-id", "--session-started-at",
+                         "--invocation-budget-seconds")
+WATCH_BOOTSTRAP_HINT = """\
+watch cannot start a babysit run: it only arms the change detector for an
+invocation that was already bootstrapped by a snapshot --start-invocation run
+(the ce-babysit-pr Step 2 bootstrap).
+To recover, invoke the ce-babysit-pr skill through your harness's callable
+skill mechanism with this PR: its instructions own the bootstrap, arming,
+marks, and stop protocol. Do not drive pr-snapshot directly outside that skill.
+Never mint the bootstrap values yourself; they come from the skill's
+bootstrap snapshot."""
+
+
+class _WatchHintingParser(argparse.ArgumentParser):
+    # A bare `watch --pr N` is the observed illegal start path (an agent arming the
+    # detector without the Step 2 bootstrap). Keep the fail-closed exit 2, but make
+    # the refusal carry its own recovery path instead of a raw usage dump.
+    def error(self, message):
+        if (self.prog.endswith(" watch") and "required" in message
+                and any(flag in message for flag in WATCH_BOOTSTRAP_FLAGS)):
+            self.print_usage(sys.stderr)
+            self.exit(2, f"{self.prog}: error: {message}\n\n{WATCH_BOOTSTRAP_HINT}\n")
+        super().error(message)
+
+
 def main():
     p = argparse.ArgumentParser(prog="pr-snapshot")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd", required=True, parser_class=_WatchHintingParser)
 
     s = sub.add_parser("snapshot")
     s.add_argument("--pr", type=int, required=True)
