@@ -294,7 +294,7 @@ Pass `{run_id}` and the resolved absolute `{run_dir}` into every Phase 1 subagen
 
    **Escalation gate.** The discovery+metadata pass above is the cheap probe and always runs in Full mode. Escalate to the extraction and synthesis stages below **only** when at least one retained candidate clears the relevance bar: a current-branch match, or ≥2 topic-keyword matches. If no candidate clears the bar (including the `_meta.files_processed` is `0` case), stop here, record `no relevant prior sessions` as the session-history input, and skip extraction and synthesis. This gate is what keeps the always-on probe cheap — the expensive synthesis is paid for only when a prior session is genuinely relevant.
 
-   **Extraction pipeline.** Create `SCRATCH=$(mktemp -d -t ce-compound-sessions-XXXXXX)`. For each selected session, write extracted content to scratch files:
+   **Extraction pipeline.** Create `SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/ce-compound-sessions-XXXXXX")`. For each selected session, write extracted content to scratch files:
 
    ```bash
    SKILL_DIR="<absolute path of the directory containing the SKILL.md you just read>";
