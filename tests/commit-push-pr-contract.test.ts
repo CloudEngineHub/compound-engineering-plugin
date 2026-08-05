@@ -321,4 +321,35 @@ describe("PR concept teaching contract", () => {
     expect(doNotFire).toMatch(/after successful handoff only/i)
     expect(doNotFire).toMatch(/not a substitute for a failed handoff/i)
   })
+
+  test("opt-in stack mode submits via gh stack and hands off with posture", async () => {
+    const [skill, submit] = await Promise.all([
+      readRepoFile("skills/ce-commit-push-pr/SKILL.md"),
+      readRepoFile("skills/ce-commit-push-pr/references/stack-submit.md"),
+    ])
+
+    expect(skill).toContain("## Stack mode (opt-in)")
+    expect(skill).toContain("**Do not** proactively suggest PR stacks")
+    expect(skill).toContain("references/stack-submit.md")
+    expect(skill).toMatch(/do not add `posture:` to this skill's argument-hint/i)
+    expect(skill).toMatch(/follow `references\/stack-submit\.md`/i)
+    expect(skill).toContain("posture:stack-ready")
+    expect(skill).toContain("posture:stack-land")
+    expect(skill).toMatch(/bottom open non-draft/i)
+    expect(skill).toMatch(/Stack mode[\s\S]{0,80}still follow `references\/stack-submit\.md`/i)
+    expect(skill).toMatch(/mode:pipeline` \*\*except\*\* when this run completed a stack-mode submit/i)
+    expect(skill).toMatch(/outer orchestrator[\s\S]{0,80}second bare babysit/i)
+    expect(skill).toMatch(/mode:pipeline[\s\S]{0,160}started-only is not enough/i)
+    expect(submit).toMatch(/authoritative parent tip/i)
+    expect(submit).toContain('git checkout -b -- "<branch-name>" "<parent-tip>"')
+    expect(submit).toMatch(/Do not hard-code `origin\/<parent>`/i)
+    expect(submit).toMatch(/Do \*\*not\*\* follow `references\/branch-creation\.md` for stack-layer base selection/i)
+    expect(submit).toContain("gh stack submit --auto --open")
+    expect(submit).toMatch(/existing draft/i)
+    expect(submit).toMatch(/do \*\*not\*\* pass `--open`/i)
+    expect(submit).toMatch(/does \*\*not\*\* invent commit-splitting/i)
+    expect(submit).toMatch(/required[\s\S]{0,120}hard-stop/i)
+    expect(submit).toMatch(/soft[\s\S]{0,120}single-PR/i)
+    expect(submit).toMatch(/Forbidden on managed members/i)
+  })
 })
