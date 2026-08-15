@@ -910,14 +910,11 @@ run_provider() {
     log "wrote $n finding(s) to $OUT (reviewer adversarial-$provider)"
   else
     log "provider $provider produced no usable schema-shaped output; skipping fold-in"
-    # Surface bounded peer output so the orchestrator can
-    # reason about WHY it was skipped (quota/usage-limit exhaustion vs an ordinary
-    # empty review) and, in a repeated-pass session, deprioritize an exhausted
-    # route. Harness-agnostic: the agent classifies from the text; this only makes
-    # the evidence visible in out.log. Surface BOTH streams -- the error can be on
-    # stdout (grok's 402) or stderr (claude/cursor auth/quota). Bash builtins only
-    # (the route sandbox has no tail/tr). Prefer structured error fields because
-    # a raw tail can discard the actionable message in a large CLI envelope.
+    # Surface bounded peer output so the orchestrator can reason about WHY it
+    # was skipped (quota/usage-limit exhaustion vs an ordinary empty review).
+    # Prefer structured error fields because a raw tail can discard the
+    # actionable message in a large CLI envelope. Surface BOTH streams -- the
+    # error can be on stdout (grok's 402) or stderr (claude/cursor auth/quota).
     if [ -s "$PEERLOG" ]; then
       _pt="$(bounded_failure_evidence "$PEERLOG")"
       log "  peer skip evidence: $_pt"

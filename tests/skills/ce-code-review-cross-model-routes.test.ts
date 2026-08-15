@@ -600,6 +600,28 @@ describe("cross-model-adversarial-review skip paths — non-blocking, no file", 
     const r = run(["codex", "claude", "HEAD", runDir], runDir, env)
     expect(r.stderr).toContain("Not logged in")
     expect(r.stderr).toContain("terminal_reason=api_error")
+    expect(r.stderr).toContain("peer skip evidence:")
+    expect(r.stderr).not.toContain("peer skip class:")
+  })
+
+  test("surfaces a Claude session-limit 429 as skip evidence, not a completed review", () => {
+    const payload = JSON.stringify({
+      result: "You have hit your session limit",
+      api_error_status: 429,
+      terminal_reason: "api_error",
+    })
+    const { env } = sandbox(
+      ["claude"],
+      `#!/bin/sh\ncat >/dev/null\nprintf '%s' '${payload}'\nexit 1\n`,
+    )
+    const runDir = makeRunDir()
+    const r = run(["codex", "claude", "HEAD", runDir], runDir, env)
+    expect(r.code).toBe(0)
+    expect(r.files).not.toContain("adversarial-claude.json")
+    expect(r.stderr).toContain("peer skip evidence:")
+    expect(r.stderr).toContain("You have hit your session limit")
+    expect(r.stderr).toContain("api_error_status=429")
+    expect(r.stderr).not.toContain("peer skip class:")
   })
 
   test("ancillary structured fields do not hide an unrecognized human-readable diagnostic", () => {

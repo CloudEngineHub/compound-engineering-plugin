@@ -1217,9 +1217,51 @@ describe("cross-model peer skip legibility", () => {
       // to classify a quota/usage-limit exhaustion (harness-agnostic reasoning).
       expect(referenceSrc).toContain("peer skip evidence:")
       expect(referenceSrc).toMatch(/quota|usage-limit/i)
-      expect(referenceSrc).toMatch(/more than once in this session/i)
+      if (worker.includes("ce-code-review")) {
+        expect(workerSrc).not.toContain("peer skip class:")
+        expect(referenceSrc).not.toContain("peer skip class:")
+        expect(referenceSrc).toMatch(/did-not-run fallback/i)
+        expect(referenceSrc).toMatch(/Judge the full diagnostic/i)
+        expect(referenceSrc).toMatch(/never silently continue to another recipient/i)
+        expect(referenceSrc).toMatch(/explicit user-stated preference/i)
+        expect(referenceSrc).toContain("in-process `adversarial-reviewer`")
+      } else {
+        expect(referenceSrc).toMatch(/more than once in this session/i)
+      }
     })
   }
+
+  test("code review restores the adversarial lens after a quota or auth no-review", async () => {
+    const skill = await readRepoFile("skills/ce-code-review/SKILL.md")
+    const dispatch = await readRepoFile(
+      "skills/ce-code-review/references/dispatch-reviewers.md",
+    )
+    const reference = await readRepoFile(
+      "skills/ce-code-review/references/cross-model-review.md",
+    )
+
+    expect(skill).toMatch(/did-not-run fallback/)
+    expect(dispatch).toMatch(/did-not-run fallback/)
+    expect(reference).toMatch(
+      /another attested-different installed\+allowlisted target remains/i,
+    )
+    expect(reference).toMatch(/announce that new recipient and start a new job/i)
+    expect(reference).toMatch(/Wait for it with the remaining shared deadline/i)
+    expect(reference).toMatch(/do not start a third peer/i)
+    expect(reference).toMatch(
+      /Otherwise \(explicit recipient, or no other eligible peer\)/i,
+    )
+  })
+
+  test("code review exclusivity pointers allow in-process restore after a failed same-route rate-limit retry", async () => {
+    const skill = await readRepoFile("skills/ce-code-review/SKILL.md")
+    const dispatch = await readRepoFile(
+      "skills/ce-code-review/references/dispatch-reviewers.md",
+    )
+
+    expect(skill).toMatch(/failed same-route rate-limit retry/)
+    expect(dispatch).toMatch(/failed same-route rate-limit retry/)
+  })
 
   // A restricted host sandbox (e.g. a Codex task with network disabled) denies
   // the spawned peer CLI network/keychain, producing the exact same
