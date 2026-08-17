@@ -3,14 +3,18 @@ import { readdirSync, readFileSync, statSync } from "node:fs"
 import path from "node:path"
 
 /**
- * Codex >= 0.147 (openai/codex#37027) classifies a plugin as an Agent Plugin when the
- * root `plugin.json` carries an `https://agent-plugins.org/schemas/...` `$schema`, and
- * then injects only the first MAX_SKILL_PROMPT_BYTES (8000) of each SKILL.md into the
- * model-visible prompt (#1412). Legacy manifests (`.codex-plugin/plugin.json`) are exempt.
+ * Two shipping hosts route on a root `plugin.json` `$schema` under the Agent Plugins prefix,
+ * and both break this plugin when they do:
  *
- * Until every skill entrypoint fits, the root manifest must not carry that `$schema`,
- * and no skill may newly cross the bound. Shrink OVER_BUDGET as skills are restructured;
- * when it is empty, the `$schema` may return.
+ * - Codex >= 0.147 (openai/codex#37027, #1412) injects only the first MAX_SKILL_PROMPT_BYTES
+ *   (8000) of each Agent Plugin SKILL.md; 26 skills exceed that.
+ * - oh-my-pi >= 17.3 (#1411) rejects any SKILL.md whose frontmatter has a key outside the
+ *   Agent Skills closed set; the Claude Code keys `argument-hint` / `disable-model-invocation`
+ *   are load-bearing, so 30 skills vanish. omp has no per-host override.
+ *
+ * So the root manifest stays schema-less unconditionally (docs/specs/agent-plugins.md); a
+ * strict client that needs conformance gets a separately emitted package. Independently, no
+ * new skill may cross Codex's byte bound, and OVER_BUDGET shrinks as skills are restructured.
  */
 const CODEX_MAX_SKILL_PROMPT_BYTES = 8_000
 const AGENT_PLUGINS_SCHEMA_PREFIX = "https://agent-plugins.org/schemas/"
@@ -92,16 +96,11 @@ describe("Codex skill prompt budget (#1412)", () => {
     expect(stale).toEqual([])
   })
 
-  test("root plugin.json omits the Agent Plugins $schema while any skill is over budget", () => {
+  test("root plugin.json never carries an Agent Plugins $schema", () => {
     const manifest = JSON.parse(
       readFileSync(path.join(repoRoot, "plugin.json"), "utf8"),
     ) as Record<string, unknown>
     const schema = typeof manifest.$schema === "string" ? manifest.$schema : ""
-    const anyOverBudget = [...sizes.values()].some(
-      (size) => size > CODEX_MAX_SKILL_PROMPT_BYTES,
-    )
-    if (anyOverBudget) {
-      expect(schema.startsWith(AGENT_PLUGINS_SCHEMA_PREFIX)).toBe(false)
-    }
+    expect(schema.startsWith(AGENT_PLUGINS_SCHEMA_PREFIX)).toBe(false)
   })
 })
