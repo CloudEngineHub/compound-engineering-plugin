@@ -35,6 +35,8 @@ const planResume = readRepoFile("skills/ce-plan/references/resume.md")
 const planCorpus =
   planSkill + planIntake + planStructure + planFinalReview + planResume
 const brainstormSkill = readRepoFile("skills/ce-brainstorm/SKILL.md")
+const brainstormPhase0 = readRepoFile("skills/ce-brainstorm/references/phase-0.md")
+const brainstormPlanWrite = readRepoFile("skills/ce-brainstorm/references/plan-write.md")
 const brainstormHandoff = readRepoFile(
   "skills/ce-brainstorm/references/handoff.md",
 )
@@ -149,8 +151,14 @@ describe("unified plan artifact contract", () => {
     expect(brainstormSkill).toContain("artifact_readiness: requirements-only")
     expect(brainstormSkill).toContain("product_contract_source: ce-brainstorm")
     expect(brainstormSkill).toContain("Do **not** emit a Goal Launch Block or Reader Index")
-    expect(brainstormSkill).toContain("new `ce-brainstorm` outputs do not write there")
-    expect(brainstormSkill).toContain("non-software route does **not** write `artifact_contract: ce-unified-plan/v1`")
+    // 2026-08-18: the legacy-path rule (Phase 0.1) and the non-software carve-out
+    // (Phase 0.1b) moved into references/phase-0.md with the rest of Phase 0 when
+    // the body was restructured under the Codex 8000-byte prompt budget. Both are
+    // artifact-content invariants, so they are asserted against the file that owns
+    // them; the frontmatter fields and the path shape above stay pinned to the body
+    // because they are the cross-skill contract ce-plan enriches.
+    expect(brainstormPhase0).toContain("new `ce-brainstorm` outputs do not write there")
+    expect(brainstormPhase0).toContain("non-software route does **not** write `artifact_contract: ce-unified-plan/v1`")
 
     expect(universalBrainstorming).toContain("outside the software unified-plan artifact contract")
     expect(universalBrainstorming).toContain("Do not write `artifact_contract: ce-unified-plan/v1`")
@@ -650,7 +658,9 @@ describe("session-settled decision contract", () => {
 
   test("ce-brainstorm loads settled-decisions.md and annotates Key Decisions with the stem", () => {
     expect(brainstormSkill).toContain("Read `references/settled-decisions.md`")
-    expect(brainstormSkill).toContain(
+    // The Phase 3 rendering rule moved into references/plan-write.md with the rest
+    // of Phase 3; the body still carries the load instruction above.
+    expect(brainstormPlanWrite).toContain(
       "Key Decisions section carrying their `session-settled:` annotation",
     )
   })
