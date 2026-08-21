@@ -26,6 +26,30 @@ describe("reasoning-elevation engine parity", () => {
     }
   })
 
+  test("keeps host network permission scoped to start and preserves inline fallback when it is denied", async () => {
+    const src = await readFile(path.join(PLUGIN_ROOT, CONSUMER_SKILLS[0], ELEVATION_ASSET), "utf8")
+    const compact = src.replace(/\s+/g, " ")
+    expect(compact).toContain("CODEX_SANDBOX_NETWORK_DISABLED")
+    expect(compact).toContain("unsetting it does not change the sandbox policy")
+    expect(compact).toContain('"sandbox_permissions": "require_escalated"')
+    expect(compact).toContain("detached worker inherits that launch context for its lifetime")
+    expect(compact).toContain("If the grant is denied or unavailable, do not execute `start`")
+    expect(compact).toContain("run the step inline on the session model")
+    expect(compact).toContain("After `start` returns a job id")
+    expect(compact).toContain("keep `status`, `wait`, `result`, and `reap` sandboxed")
+  })
+
+  test("defers authentication proof to the provider-capable dispatch context", async () => {
+    const src = await readFile(path.join(PLUGIN_ROOT, CONSUMER_SKILLS[0], ELEVATION_ASSET), "utf8")
+
+    expect(src).not.toContain("claude auth status")
+    expect(src).not.toContain("`claude` not authenticated")
+    expect(src).toContain("the detached worker's provider-capable call is authoritative")
+    expect(src).toContain("an authentication failure there follows Recovery")
+    expect(src).toContain("Once provider-capable dispatch is established")
+    expect(src).toContain("login or credential-refresh remediation")
+  })
+
   // Narrow guard: the legacy "fable" token must not return to an always-loaded
   // SKILL.md. Model choice now arrives from config or the prompt at runtime, so a
   // hardcoded model name in a SKILL.md hook is a regression — the engine and its
