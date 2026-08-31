@@ -750,3 +750,16 @@ describe("ce-work right-sized routes", () => {
     expect(intake).toMatch(/Unless `ce-plan` already sized this prompt in this session/)
   })
 })
+
+describe("ce-work out-of-repo unit completion (#1574)", () => {
+  test("implementation loop does not treat a clean tree as not-started for external deliverables", async () => {
+    const loop = await readRepoFile("skills/ce-work/references/implementation-loop.md")
+    expect(loop).toContain("out-of-repo state")
+    expect(loop).toContain("no git-derived completion signal")
+    expect(loop.indexOf("out-of-repo state")).toBeLessThan(
+      loop.indexOf("If the unit's entire completion signal is repository-derived"),
+    )
+    const docs = await readRepoFile("docs/guides/ce-work.md")
+    expect(docs).toContain("no git-derived completion signal")
+  })
+})
