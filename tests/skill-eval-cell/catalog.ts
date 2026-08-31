@@ -17,6 +17,8 @@ import { WORKTREE_REF } from "./extract"
 
 export const PRE_SWEEP_REF = "309611f6b5198528c1c98f83fb6b3c90637e523c"
 export const ISSUE_1482_BASE_REF = "66ccf579f8c1ef2ccfc642c317ba53151eeb1ebb"
+/** main before the PR-opening placement rule became a legibility condition (#1572 follow-up): the A/B base for the opening-shape rows. */
+export const PR_OPENING_BASE_REF = "f6c301cafc888f965ffd99195eb5f95ac2c6d9a8"
 /** main before the right-size-ceremony change (#1513 release commit): the A/B base for its rows. */
 export const RIGHT_SIZE_BASE_REF = "925b4ef71cbee0b4205693c4cafc9b2c557a603a"
 /** main before CODING_STANDARDS.md became the designated criteria source: the A/B base for the standards-discovery rows. */
@@ -47,6 +49,14 @@ export type Grade = {
    */
   workspace_read?: string[]
   must_include?: string[]
+  /**
+   * Scope must_include to this delimited field of the answer (e.g. `OPENING`) instead
+   * of the whole answer. The trailers wrapPrompt mandates are part of stdout, so an
+   * unscoped needle can be satisfied by a read path in FILES_READ or a branch name in
+   * ACTIONS rather than by the text under test. A run that emitted no such field fails,
+   * so declaring nothing cannot pass.
+   */
+  must_include_field?: string
   /** Exact value of the answer's `Classification:` field. */
   classification?: "Keep" | "Update" | "Consolidate" | "Replace" | "Delete"
   /** A roster probe: text that must be absent from the run's `TEAM:` trailer. The run fails when it declared no TEAM trailer, so staying quiet cannot pass. must_include also reads that trailer when present. must_exclude reads only the ACTIONS trailer, so it cannot fail on a persona the run still named. */
@@ -413,6 +423,87 @@ The same decision owns open review thread PRRT_ci_contract_7 at https://github.c
       files_read_post: ["references/pr-description-writing.md"],
       actions: "none",
       git: "clean",
+    },
+  },
+  {
+    id: "ce-commit-push-pr/enabler-opening-carries-the-program",
+    skill: "ce-commit-push-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    baseline_ref: PR_OPENING_BASE_REF,
+    read_only: false,
+    git_init: true,
+    git_remote: true,
+    git_staged: ["src/session-stamp.js"],
+    shim_git_push: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/pr-series-enabler`,
+    timeout_secs: 900,
+    why: "#1572: a first-in-series change whose local outcome is unmotivated on its own. The old rule put program context in a block after the opening no matter what, so the opening read as a pointless field addition and was rejected twice. The staged module is named for the mechanism (a monotonic stamp), never for the program, so 'revocation' can only reach the opening from the program context. The grade reads the delimited OPENING field, not stdout, so the trailers cannot satisfy a needle.",
+    pre_contract:
+      "The opening carries one idea and program context is a short additive block after it, never part of the opening's sentence.",
+    task: `Commit the staged change, then write the PR description for this branch.
+
+Context: this is the first of three PRs in the server-side session revocation project. This one lands the stamp; PR 2 adds the operator endpoint that bumps a user's stamp; PR 3 makes the request path refuse sessions issued before it.
+
+Do not push and do not open a PR. Print the description's opening — the one or two sentences that lead the body — on a single line prefixed with "OPENING:" and nothing else.`,
+    grade: {
+      // Scoped to the OPENING field, not stdout: the mandated trailers are part of
+      // stdout, so a whole-stdout needle is satisfiable by a read path (FILES_READ:
+      // src/session-stamp.js carries "stamp") or a branch name (ACTIONS: created
+      // branch session-revocation-stamp carries both) instead of the opening.
+      // Both needles, because the condition requires both halves in the opening.
+      // "revo" covers revocation/revoke/revoked: the program's purpose, which the
+      // opening can only carry from the program context, never from the diff.
+      // "stamp" is this PR's own contribution — the staged module's mechanism — which
+      // an opening that names only the arc has no reason to mention.
+      must_include: ["revo", "stamp"],
+      must_include_field: "OPENING",
+      // The task asks for the commit first, and the skill resolves its range as
+      // origin/main..HEAD: with the change only staged, that range is empty against
+      // the fake origin/main and the skill is supposed to stop rather than compose.
+      // Without this the grade cannot tell an opening composed through the
+      // description path from one printed after skipping or failing the commit.
+      committed_must: ["session-stamp.js"],
+    },
+  },
+  {
+    id: "ce-commit-push-pr/standalone-slice-keeps-its-outcome",
+    skill: "ce-commit-push-pr",
+    cohort: "resized",
+    key_behavior: "judgment",
+    baseline_ref: PR_OPENING_BASE_REF,
+    read_only: false,
+    git_init: true,
+    git_remote: true,
+    git_staged: ["src/stale-session-guard.js"],
+    shim_git_push: true,
+    shim_gh_pr: true,
+    fixture: `${FIX}/pr-series-slice`,
+    timeout_secs: 900,
+    why: "The counter-failure the old absolute existed to prevent (#1422): an opening that leads with the arc and leaves a reviewer unable to say what this PR does. Here the local outcome stands on its own, so the opening must still carry it. The grade reads the delimited OPENING field, not stdout, so the trailers cannot satisfy the needle. Deliberately coarse: it checks that an opening exists and names the mechanism this slice changes, and does NOT verify that the opening satisfies Step C's condition — no substring can.",
+    pre_contract:
+      "The opening states this PR's own outcome; a reviewer who stops there knows what the PR does.",
+    task: `Commit the staged change, then write the PR description for this branch.
+
+Context: this is the second of three PRs in the server-side session revocation project. PR 1 landed the per-user stamp; PR 3 adds the operator endpoint that bumps it.
+
+Do not push and do not open a PR. Print the description's opening — the one or two sentences that lead the body — on a single line prefixed with "OPENING:" and nothing else.`,
+    grade: {
+      // Scoped to the OPENING field, not stdout: the mandated trailers are part of
+      // stdout, so a whole-stdout needle is satisfiable by a read path or an ACTIONS
+      // commit SHA instead of by the opening.
+      // "stamp" is the mechanism this slice changes, and the coarsest honest needle:
+      // it verifies an opening exists and is about this change, and deliberately does
+      // not attempt to verify the condition. The previous needle was the literal
+      // "401", which failed a correct opening that said "reject" instead — the
+      // false-fail half of why a substring cannot grade prose.
+      must_include: ["stamp"],
+      must_include_field: "OPENING",
+      // Same as the enabler row: the task asks for the commit first, and an empty
+      // origin/main..HEAD range means the opening was not produced through the
+      // description path, so the commit is graded and not just the printed line.
+      committed_must: ["stale-session-guard.js"],
     },
   },
   {
