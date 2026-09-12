@@ -608,6 +608,66 @@ describe("ce-code-review contract", () => {
     expect(solution).toMatch(/fail closed.*lifecycle obligations.*detached work.*already started/i)
   })
 
+  test("#1690: the round finishes from run-dir artifacts in a fresh context", async () => {
+    const skill = await readRepoFile("skills/ce-code-review/SKILL.md")
+    const dispatch = await readRepoFile("skills/ce-code-review/references/dispatch-reviewers.md")
+    const finish = await readRepoFile("skills/ce-code-review/references/finish-review.md")
+    const handoff = await readRepoFile("skills/ce-code-review/references/finish-input.md")
+
+    // The body decides the split from the window: always on, fresh subagent, verbatim return.
+    expect(skill).toMatch(/write the finish input `references\/finish-input\.md` defines/)
+    expect(skill).toMatch(/two leaf subagents it names/)
+    expect(skill).toMatch(/Neither leaf launches a subagent; you launch every one/)
+    expect(skill).toMatch(/Emit the report leaf's return verbatim/)
+    expect(skill).toMatch(/never merge or render in the dispatch context/)
+    // The peer's reap moves with the fold-in; dispatch stops touching the peer once the file is written.
+    expect(dispatch).toMatch(/record the result as `peer\.outcome`, `peer\.artifact`, and `peer\.coverage` in `finish-input\.json`/)
+    // #1692 review round 3: every peer recovery branch needs a launch or a disclosure, so the peer is
+    // terminal and classified in the dispatch context before any leaf starts.
+    expect(dispatch).toMatch(/perform the reference's single bounded status\/wait\/reap sequence here, in the dispatch context/)
+    expect(dispatch).toMatch(/The merge leaf folds the recorded artifact and decides nothing about the peer/)
+    // The finish reference reads the file first and resolves its earlier-stage references from it.
+    expect(finish).toMatch(/^This reference runs across three contexts/m)
+    expect(finish).toMatch(/A leaf launches no subagents/)
+    expect(finish).toMatch(/Each leaf reads `<run-dir>\/finish-input\.json` first/)
+    expect(finish).toMatch(/- `finish-input\.json`/)
+    // The contract file names every field the finish context may need and the failure direction.
+    for (const field of ["run_id", "skill_dir", "docs_root", "apply_local", "raw-returns.json", "failed_reviewers", "preference_source", "coverage_notes"]) {
+      expect(handoff).toContain(field)
+    }
+    expect(handoff).toMatch(/emit the report leaf's return verbatim/i)
+    expect(handoff).toMatch(/No leaf launches a subagent/)
+    expect(handoff).toMatch(/validator stays a parent launch on every host/)
+    for (const f of ["synthesized-findings.json", "validator-input.json", "validator-verdicts.json", "validator-outcome.json"]) expect(handoff).toContain(f)
+    // #1692 review round 4: a validator that never produced verdicts still needs a record the report leaf can classify from.
+    expect(handoff).toMatch(/a missing record is a failed finish, never a silent pass/)
+    // #1692 review round 5: paths must exist, base: is standalone scope, and a mutating leaf loads the project's instructions.
+    expect(handoff).toMatch(/writes `files\.txt` and `full\.diff` in every run/)
+    expect(handoff).toContain("tree_is_reviewed_head")
+    expect(handoff).not.toMatch(/standalone \| base \|/)
+    expect(handoff).toMatch(/Before any Stage 5c edit, read the project's instruction files/)
+    // #1692 review round 6: the handoff states the condition (verbatim field or named reference, no third source)
+    // instead of growing a field list; the three carriers below are the instances that round found.
+    expect(handoff).toMatch(/either a field here, carried verbatim rather than summarized, or a rule in a reference the leaf is named to read/)
+    for (const f of ["invocation.constraints", "plan.requirements", "plan.implementation_units"]) expect(handoff).toContain(f)
+    expect(handoff).toMatch(/inspects the reviewed head \(`scope\.diff_b`\) the way `diff-scope\.md` directs reviewers to/)
+    expect(handoff).toMatch(/writes `validator-verdicts\.json` from that verdict before recording the outcome/)
+    // #1692 review: a recipient change needs the visible dispatch channel; the finish context never starts a peer route.
+    expect(handoff).toMatch(/This leaf never reads job state, waits on a peer, or starts a route/)
+    for (const f of ["peer.outcome", "peer.artifact", "peer.coverage"]) expect(handoff).toContain(f)
+    expect(handoff).not.toContain("job_id")
+    expect(handoff).toMatch(/Put the full contents of `finish-input\.json` inline in the leaf's prompt/)
+    expect(handoff).toContain("preference_source")
+    // Cursor security review on #1692: PR metadata inlined into a leaf must never read as apply authority.
+    expect(handoff).toMatch(/`mode\.apply_local` is the only apply authority the leaves ever see/)
+    expect(finish).toMatch(/inside a leaf that flag is the only authority/)
+    // #1692 review: prose-return reviewers write no artifact; dispatch persists them and names them in the handoff.
+    expect(handoff).toContain("unstructured_returns")
+    expect(handoff).toMatch(/saves each such return verbatim to `<run-dir>\/<reviewer>\.md`/)
+    expect(dispatch).toMatch(/save each such return verbatim to `\{run_dir\}\/\{reviewer_name\}\.md`/)
+    expect(handoff).toMatch(/\{"status":"failed","reason":"<one sentence>"\}/)
+  })
+
   test("Stage 5 synthesis uses anchor gate and one-anchor promotion", async () => {
     const content = await readRepoFile(
       "skills/ce-code-review/references/finish-review.md",
