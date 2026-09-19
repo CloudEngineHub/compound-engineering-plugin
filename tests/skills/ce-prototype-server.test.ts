@@ -1350,6 +1350,11 @@ describe("ce-prototype light-webserver.js", () => {
     expect(overlay).toContain("Could not send to agent — retry")
     expect(overlay).toContain("Could not end session — retry")
     expect(overlay).toContain('pin.status === "pending" || pin.status === "working"')
+    // An applied note's pin leaves the page.
+    expect(overlay).toContain('if (annotationStates[pins[i].id] === "done") pins.splice(i, 1)')
+    // Pins never take the click meant for the control under them; the comment shows by pointer position.
+    expect(overlayCss).toMatch(/\.ce-annotate-pin \{[^}]*pointer-events: none;/)
+    expect(overlay).toContain("showPinTipAt(event.clientX, event.clientY)")
     expect(overlay).toContain('addEventListener("scroll", reattachPins')
     expect(overlay).toContain("new ResizeObserver(reattachPins)")
     expect(overlay).toContain("new MutationObserver(reattachPins)")
@@ -1367,7 +1372,7 @@ describe("ce-prototype light-webserver.js", () => {
     // Pin status follows the helper's annotation lifecycle, never a reload;
     // an open draft survives a reload; a reload waits for an in-flight POST.
     expect(overlay).toContain('addEventListener("annotations"')
-    expect(overlay).toContain('{ held: "pending", queued: "pending", working: "working", done: "attached" }')
+    expect(overlay).toContain('{ held: "pending", queued: "pending", working: "working" }')
     expect(overlay).not.toContain("advancePinsAfterRevision")
     expect(overlay).toMatch(/draft: draft\n\s+\? \{ \.\.\.draft, page: servedPage, text: commentField\.value/)
     expect(overlay).toMatch(/if \(inFlight\) \{\n\s+reloadPending = true/)
