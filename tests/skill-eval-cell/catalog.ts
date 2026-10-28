@@ -47,6 +47,8 @@ export const REVIEW_SCOPE_BASE_REF = "9f5b16fc617fb5bf4817c8f42537b626c17abd05"
 export const RESOLVER_PUBLICATION_BASE_REF = "bb5899b36c133a8441fa79af7cf60420c8191c6b"
 /** main before ce-debug preferred removing a recurring bug pattern over layering runtime checks. */
 export const STRUCTURAL_FIX_BASE_REF = "2b4cacd32d3e8c19a91e1c50c318172ec1d2f160"
+/** main before the ce-debug session-audit changes (other affected places, behavior-based review skip, findings-shaped options). */
+export const DEBUG_AUDIT_BASE_REF = "00d0a5bbf1300b2138b65ce724b325dd4dff77ba"
 /** main before the reliability reviewer judged a missing guard by how the code runs. */
 export const RELIABILITY_CONTEXT_BASE_REF = "8d9a236dc91b17e114562bd65e9e137d171f39ab"
 /** main before ce-work dropped its goal/workflow engines, ran chained units inline, and ce-plan stopped offering /goal. */
@@ -1914,6 +1916,26 @@ Include exactly one line \`FIX: asked\` or \`FIX: applied\` or \`FIX: skipped\` 
       // git: clean only proves nothing is left unstaged; committing the fix before
       // asking would otherwise leave a clean tree and pass.
       committed_must_not: ["seat-cap.js"],
+    },
+  },
+  {
+    id: "ce-debug/fix-accounts-for-other-consumers",
+    baseline_ref: DEBUG_AUDIT_BASE_REF,
+    skill: "ce-debug",
+    cohort: "untouched",
+    key_behavior: "mutation",
+    read_only: false,
+    git_init: true,
+    fixture: `${FIX}/debug-sibling-consumer`,
+    timeout_secs: 900,
+    why: "Real sessions shipped fixes that changed a contract and missed one or two other users of it; review or PR bots caught them later. The old 3+ files trigger never fired on a single other site.",
+    pre_contract: "The minimal fix covers the root cause only; self-review reads the changed lines; defense-in-depth triggers on the pattern in 3+ other files.",
+    task: "Use ce-debug on this bug. Phases 1 and 2 are done: read DIAGNOSIS.md; the user chose to fix it now. Run Phase 3 on the current branch. Then, instead of Phase 4, commit every file the fix changed with git (one commit, no push) and stop. Do not invoke another skill or dispatch.",
+    grade: {
+      workspace_read: ["DIAGNOSIS.md"],
+      // src/admin.js treats a throw from lookupUser as "unknown user"; once lookupUser
+      // returns null instead, grantAdmin admits unknown ids unless admin.js changes too.
+      committed_must: ["users.js", "profile.js", "admin.js"],
     },
   },
   {

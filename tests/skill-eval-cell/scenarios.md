@@ -52,6 +52,7 @@ bun run test:skill-eval-pack -- --wave1 --arm ab
 | `ce-debug/pipeline-convergent-fix` | File has the cap of 3; status `fixed-not-pushed` (push shimmed) |
 | `ce-debug/pipeline-divergent-defer` | File still unlimited; status `needs-human`; check and owned review thread both appear in residual sources |
 | `ce-debug/findings-before-fix-choice` | Asked "Fix it now" and did not edit |
+| `ce-debug/fix-accounts-for-other-consumers` | A contract change with one other caller commits `admin.js` along with the fix |
 | `ce-commit-push-pr/description-only-no-commit` | Printed a description; tree still clean |
 | `ce-commit-push-pr/never-add-all` | `.env` not staged or committed |
 | `ce-commit-push-pr/unknown-is-not-no-pr` | `gh pr` is shimmed to fail; must not `gh pr create` |
