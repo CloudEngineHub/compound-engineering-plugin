@@ -1,5 +1,5 @@
 import path from "path"
-import { backupFile, commandNameToRelativePath, copySkillDir, ensureDir, pathExists, readJson, sanitizePathName, writeJson, writeText } from "../utils/files"
+import { backupFile, commandNameToRelativePath, copySkillDir, ensureDir, pathExists, readJson, readText, sanitizePathName, writeJson, writeText } from "../utils/files"
 import { transformSkillContentForOpenCode } from "../converters/claude-to-opencode"
 import type { OpenCodeBundle, OpenCodeConfig } from "../types/opencode"
 import { getLegacyOpenCodeArtifacts } from "../data/plugin-legacy-artifacts"
@@ -119,21 +119,23 @@ export async function writeOpenCodeBundle(
 
   await ensureDir(openCodePaths.root)
   const hadExistingConfig = await pathExists(openCodePaths.configPath)
-  const backupPath = await backupFile(openCodePaths.configPath)
-  if (hadExistingConfig && !backupPath) {
-    throw new Error(`Could not back up existing config at ${openCodePaths.configPath}; refusing to modify the install.`)
-  }
-  if (backupPath) {
+  const existingConfigText = hadExistingConfig ? await readText(openCodePaths.configPath) : null
+  const merged = await mergeOpenCodeConfig(openCodePaths.configPath, bundle.config)
+  const configChanged = existingConfigText !== `${JSON.stringify(merged, null, 2)}\n`
+  if (hadExistingConfig && configChanged) {
+    const backupPath = await backupFile(openCodePaths.configPath)
+    if (!backupPath) {
+      throw new Error(`Could not back up existing config at ${openCodePaths.configPath}; refusing to modify the install.`)
+    }
     console.log(`Backed up existing config to ${backupPath}`)
   }
-  const merged = await mergeOpenCodeConfig(openCodePaths.configPath, bundle.config)
 
   if (!agentsEscaped) await cleanupRemovedManagedFiles(openCodePaths.agentsDir, manifest, "agents", currentAgents)
   if (!commandsEscaped) await cleanupRemovedManagedFiles(openCodePaths.commandDir, manifest, "commands", currentCommands)
   if (!pluginsEscaped) await cleanupRemovedManagedFiles(openCodePaths.pluginsDir, manifest, "plugins", currentPlugins)
   if (!skillsEscaped) await cleanupRemovedManagedDirectories(openCodePaths.skillsDir, manifest, "skills", currentSkills)
 
-  await writeJson(openCodePaths.configPath, merged)
+  if (configChanged) await writeJson(openCodePaths.configPath, merged)
 
   const seenAgents = new Set<string>()
   const preservedAgentNames = new Set<string>()
@@ -171,11 +173,16 @@ export async function writeOpenCodeBundle(
       preservedCommandNames.add(commandName)
       continue
     }
-    const cmdBackupPath = await backupFile(dest)
-    if (cmdBackupPath) {
-      console.log(`Backed up existing command file to ${cmdBackupPath}`)
+    const nextCommandText = commandFile.content + "\n"
+    const existingCommandText = await readText(dest).catch(() => null)
+    if (existingCommandText === nextCommandText) continue
+    if (existingCommandText !== null) {
+      const cmdBackupPath = await backupFile(dest)
+      if (cmdBackupPath) {
+        console.log(`Backed up existing command file to ${cmdBackupPath}`)
+      }
     }
-    await writeText(dest, commandFile.content + "\n")
+    await writeText(dest, nextCommandText)
   }
 
   const preservedPluginNames = new Set<string>()
